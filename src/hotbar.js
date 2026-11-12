@@ -93,8 +93,9 @@ export class Hotbar {
         el.shownBlock = blockId;
       }
 
-      // Show the count (blank for an empty slot).
-      el.count.textContent = stack ? stack.count : '';
+      // Show the count (blank for an empty slot, ∞ in creative mode).
+      if (!stack) el.count.textContent = '';
+      else el.count.textContent = this.inventory.creative ? '∞' : stack.count;
       el.slot.classList.toggle('is-selected', i === this.selected);
     });
   }

@@ -76,6 +76,23 @@
       #saved.show {
         opacity: 1;
       }
+      #creative-badge {
+        position: fixed;
+        left: 50%;
+        top: 8px;
+        transform: translateX(-50%);
+        padding: 4px 12px;
+        background: var(--creative-badge-bg);
+        color: var(--creative-badge-text);
+        font: bold 13px system-ui, sans-serif;
+        letter-spacing: 0.1em;
+        border-radius: 4px;
+        pointer-events: none;
+        display: none;
+      }
+      #creative-badge.show {
+        display: block;
+      }
       #reset {
         margin-top: 12px;
         padding: 8px 16px;
@@ -96,9 +113,10 @@
     <div id="hotbar"></div>
     <div id="fps"></div>
     <div id="saved">✓ Saved</div>
+    <div id="creative-badge">CREATIVE</div>
     <div id="overlay">
       <h1>Click to play</h1>
-      <p>WASD move · Mouse look · Space jump · Esc pause · T speed up time</p>
+      <p>WASD move · Mouse look · Space jump · Esc pause · T speed up time · C creative mode</p>
       <p>Left click break · Right click place · 1–9 or scroll to pick block</p>
       <p>Broken blocks go in your hotbar. Placing a block uses one up.</p>
       <p>Your changes and inventory save automatically.</p>

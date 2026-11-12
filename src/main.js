@@ -8,6 +8,7 @@ import { FpsCounter } from './fps.js';
 import { EditStore } from './storage.js';
 import { Hotbar } from './hotbar.js';
 import { Inventory } from './inventory.js';
+import { CreativeToggle } from './creative.js';
 import { applyUiTheme } from './theme.js';
 import { DayNight } from './dayNight.js';
 
@@ -93,6 +94,9 @@ function findSpawn(x, z) {
 // The hotbar's scroll wheel only works while playing (mouse captured).
 const hotbar = new Hotbar(document.getElementById('hotbar'), inventory, () => player.locked);
 const interaction = new Interaction(camera, world, player, scene, hotbar, inventory);
+
+// ---- Creative mode: press C for unlimited blocks ----
+new CreativeToggle(document.getElementById('creative-badge'), inventory, () => player.locked);
 
 // ---- Performance readout in the top-left corner ----
 const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight, player);

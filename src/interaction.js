@@ -49,7 +49,8 @@ export class Interaction {
     if (!isBreakableId(blockId)) return; // e.g. the core rock floor
     if (!this.world.setBlock(hit.x, hit.y, hit.z, BLOCK.AIR)) return; // chunk not loaded
     // Collect it. If the inventory is full, the block is simply lost.
-    this.inventory.add(dropId(blockId));
+    // In creative mode you already have unlimited blocks, so nothing is collected.
+    if (!this.inventory.creative) this.inventory.add(dropId(blockId));
   }
 
   placeBlock() {
@@ -63,8 +64,8 @@ export class Interaction {
     const z = hit.z + hit.nz;
     if (this.world.getBlock(x, y, z) !== BLOCK.AIR) return;
     if (this.player.overlapsBlock(x, y, z)) return; // don't trap yourself
-    // Only use one up if the block really went in.
-    if (this.world.setBlock(x, y, z, blockId)) {
+    // Only use one up if the block really went in (and never in creative mode).
+    if (this.world.setBlock(x, y, z, blockId) && !this.inventory.creative) {
       this.inventory.removeFromSlot(this.hotbar.selected, 1);
     }
   }

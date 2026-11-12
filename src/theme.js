@@ -152,6 +152,9 @@ export const THEME = {
     '--hotbar-selected-glow': '0 0 10px rgba(255, 255, 255, 0.55)',
     '--hotbar-name-bg': 'rgba(0, 0, 0, 0.55)',
     '--hotbar-count-shadow': '1px 1px 0 #000000', // outline so counts are readable on any block
+
+    '--creative-badge-bg': 'rgba(240, 180, 40, 0.9)', // "CREATIVE" label at the top of the screen
+    '--creative-badge-text': '#2a1c00',
   },
 };
 

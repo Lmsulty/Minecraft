@@ -23,6 +23,7 @@ export class Inventory {
     this.onSaved = onSaved;
     this.slots = new Array(INVENTORY_SIZE).fill(null);
     this.selected = 0;       // which hotbar slot is in your hand (0-8)
+    this.creative = false;   // creative mode: unlimited blocks (see creative.js)
     this.listeners = [];
     this.dirty = false;      // true = there are changes not saved yet
     this.saveTimer = null;
@@ -55,6 +56,13 @@ export class Inventory {
   select(index) {
     if (index === this.selected) return;
     this.selected = index;
+    this.changed();
+  }
+
+  // Turn creative mode on or off.
+  setCreative(on) {
+    if (on === this.creative) return;
+    this.creative = on;
     this.changed();
   }
 
@@ -135,12 +143,13 @@ export class Inventory {
     if (Number.isInteger(saved.selected) && saved.selected >= 0 && saved.selected < HOTBAR_SIZE) {
       this.selected = saved.selected;
     }
+    if (typeof saved.creative === 'boolean') this.creative = saved.creative;
   }
 
   saveNow() {
     clearTimeout(this.saveTimer);
     if (!this.dirty || this.disabled) return;
-    const data = { slots: this.slots, selected: this.selected };
+    const data = { slots: this.slots, selected: this.selected, creative: this.creative };
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(data));
       this.dirty = false;
@@ -156,6 +165,7 @@ export class Inventory {
     clearTimeout(this.saveTimer);
     this.slots.fill(null);
     this.selected = 0;
+    this.creative = false;
     this.dirty = false;
     this.disabled = true;
     try {
