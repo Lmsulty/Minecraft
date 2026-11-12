@@ -1,0 +1,21 @@
+# Libraries (reinstalled with `npm install`)
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Secrets — never commit
+.env
+.env.*
+
+# Mac / editor junk
+.DS_Store
+.vscode/
+.idea/
+
+# Vite cache
+.vite/
