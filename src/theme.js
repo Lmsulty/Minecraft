@@ -51,6 +51,26 @@ export const THEME = {
   // could make this a faint glow, e.g. '#183020'.
   caveLight: '#2c2c38',
 
+  // ---- Trees: shape and placement (logic in trees.js) ----
+  // Colours come from the trunk/leaf blocks' textures below. For alien trees,
+  // change the numbers here, or point trunkBlock/leafBlock at other blocks.
+  trees: {
+    chance: 0.35,          // how many possible spots get a tree (0 = none, 1 = as many as fit)
+    spacing: 3,            // extra room between trees (bigger = more spread out)
+    trunkBlock: 'wood',    // block names from blocks.js
+    leafBlock: 'leaves',
+    trunkHeight: [4, 6],   // random between these (inclusive)
+    // Leaf layers, measured from the top block of the trunk (y: 0).
+    // radius 2 = 5 x 5 square, radius 1 = 3 x 3, radius 0 = a single block.
+    canopy: [
+      { y: -1, radius: 2 },
+      { y: 0, radius: 2 },
+      { y: 1, radius: 1 },
+      { y: 2, radius: 0 },
+    ],
+    trimCorners: true,     // remove each layer's 4 corners for a rounder shape
+  },
+
   // ---- Block textures (see textures.js for the patterns) ----
   // Lists like base: [...] are picked from at random, pixel by pixel.
   // Keep each list the same length if you want the same pattern with new colours.

@@ -139,13 +139,13 @@ export class World {
 
   generateChunk(cx, cz) {
     const chunk = new Chunk(cx, cz);
-    // 1. Terrain from the seeded noise: hills, caves, floor.
+    // 1. Terrain from the seeded noise: hills, caves, floor, trees.
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       for (let lz = 0; lz < CHUNK_SIZE; lz++) {
         const x = cx * CHUNK_SIZE + lx;
         const z = cz * CHUNK_SIZE + lz;
         const col = this.terrain.column(x, z);
-        for (let y = 0; y <= col.height && y < WORLD_HEIGHT; y++) {
+        for (let y = 0; y <= col.top && y < WORLD_HEIGHT; y++) {
           const id = this.terrain.blockInColumn(x, y, z, col);
           if (id !== BLOCK.AIR) chunk.set(lx, y, lz, id);
         }

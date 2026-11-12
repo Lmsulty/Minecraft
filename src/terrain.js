@@ -1,9 +1,10 @@
 import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { BLOCK } from './blocks.js';
 import { makeRandom } from './random.js';
+import { treeAtColumn, treeBlockAt } from './trees.js';
 
 // Decides what the untouched world looks like at any spot: hills, caves,
-// sinkholes and hillside entrances leading into them, and the unbreakable floor. It only uses seeded noise, so the same seed always
+// sinkholes and hillside entrances leading into them, trees, and the unbreakable floor. It only uses seeded noise, so the same seed always
 // gives the same world, and any chunk can be thrown away and rebuilt
 // identically later. world.js (generating chunks) and the save system
 // (blockAt) both use the SAME functions here, so they always agree.
@@ -104,6 +105,15 @@ export class Terrain {
   // Everything about a column that doesn't change with height. Worked out
   // once per column when generating a chunk, instead of once per block.
   column(x, z) {
+    const col = this.groundColumn(x, z);
+    col.tree = treeAtColumn(this, x, z); // tree trunk/leaves above this column, or null
+    // Highest block this column can have (used to know how far up to fill).
+    col.top = col.tree ? Math.max(col.height, col.tree.top) : col.height;
+    return col;
+  }
+
+  // Like column(), but without trees: just the ground and the caves in it.
+  groundColumn(x, z) {
     // Sinkholes close enough to carve this column: the one in this cell, and the starter.
     const sinkholes = [];
     for (const s of [this.sinkholeFor(x, z), this.starter]) {
@@ -130,6 +140,45 @@ export class Terrain {
     }
     this.sinkholeCache.set(key, list);
     return list;
+  }
+
+  // Remember the result of make() under `key`, so it's only worked out once.
+  cached(key, make) {
+    if (this.sinkholeCache.has(key)) return this.sinkholeCache.get(key);
+    const value = make();
+    if (this.sinkholeCache.size > CACHE_LIMIT) this.sinkholeCache.clear();
+    this.sinkholeCache.set(key, value);
+    return value;
+  }
+
+  // Can a tree grow with its trunk at (x, z)? Not near spawn, not blocking the
+  // view of the starter sinkhole, not in or next to a sinkhole, and not over
+  // any cave opening (every column under the canopy must have its ground intact).
+  canGrowTree(x, z, radius) {
+    const keepClear = radius + 2;
+    if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < keepClear + 1) return false;
+    if (distanceToLine(x + 0.5, z + 0.5, SPAWN.x + 0.5, SPAWN.z + 0.5, this.starter.x, this.starter.z) < keepClear) {
+      return false;
+    }
+    // Sinkholes: the starter, and any in this or the neighbouring sinkhole cells.
+    const nearbySinkholes = [this.starter];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        nearbySinkholes.push(this.sinkholeFor(x + dx * SINKHOLE_CELL, z + dz * SINKHOLE_CELL));
+      }
+    }
+    for (const s of nearbySinkholes) {
+      if (s && Math.hypot(x + 0.5 - s.x, z + 0.5 - s.z) < SINKHOLE_REACH + keepClear) return false;
+    }
+    // Ground under the trunk must be grass, and nothing under the canopy dug out.
+    for (let dx = -radius; dx <= radius; dx++) {
+      for (let dz = -radius; dz <= radius; dz++) {
+        const col = this.groundColumn(x + dx, z + dz);
+        const ground = this.blockInColumn(x + dx, col.height, z + dz, col);
+        if (dx === 0 && dz === 0 ? ground !== BLOCK.GRASS : ground === BLOCK.AIR) return false;
+      }
+    }
+    return true;
   }
 
   // A random generator for one grid cell: same world seed + same cell = same numbers.
@@ -342,7 +391,8 @@ export class Terrain {
   // The original block at height y in a column (see column()).
   blockInColumn(x, y, z, col) {
     if (y === 0) return BLOCK.CORE;               // unbreakable floor
-    if (y > col.height) return BLOCK.AIR;
+    // Above the ground: a tree, or open air. (Trees never fill caves.)
+    if (y > col.height) return col.tree ? treeBlockAt(col.tree, x, y, z) : BLOCK.AIR;
     if (this.isCave(x, y, z, col)) return BLOCK.AIR;
     if (y === col.height) return BLOCK.GRASS;
     if (y >= col.height - DIRT_DEPTH) return BLOCK.DIRT;
@@ -355,4 +405,12 @@ export class Terrain {
     if (y < 0 || y >= this.worldHeight) return BLOCK.AIR;
     return this.blockInColumn(x, y, z, this.column(x, z));
   }
+}
+
+// Shortest distance from point (px, pz) to the straight line from (ax, az) to (bx, bz).
+function distanceToLine(px, pz, ax, az, bx, bz) {
+  const abx = bx - ax;
+  const abz = bz - az;
+  const t = Math.max(0, Math.min(1, ((px - ax) * abx + (pz - az) * abz) / (abx * abx + abz * abz)));
+  return Math.hypot(ax + abx * t - px, az + abz * t - pz);
 }
