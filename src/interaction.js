@@ -1,23 +1,18 @@
 import * as THREE from 'three';
-import { BLOCK, BLOCK_TYPES } from './blocks.js';
+import { BLOCK } from './blocks.js';
 
 // Breaking and placing blocks: finds the block under the crosshair,
-// draws an outline around it, and handles mouse clicks and number keys.
+// draws an outline around it, and handles mouse clicks.
+// Which block gets placed comes from the hotbar (hotbar.js).
 
 const REACH = 5; // how far away (in blocks) you can break/place
 
-// Number keys 1-7 -> which block they select.
-const HOTBAR = [
-  BLOCK.GRASS, BLOCK.DIRT, BLOCK.STONE, BLOCK.WOOD,
-  BLOCK.LEAVES, BLOCK.SAND, BLOCK.PLANKS,
-];
-
 export class Interaction {
-  constructor(camera, world, player, scene, label) {
+  constructor(camera, world, player, scene, hotbar) {
     this.camera = camera;
     this.world = world;
     this.player = player;
-    this.label = label; // on-screen "Selected: ..." text
+    this.hotbar = hotbar;
     this.direction = new THREE.Vector3();
 
     // Wireframe box drawn around the targeted block. Slightly bigger
@@ -30,14 +25,7 @@ export class Interaction {
     this.outline.visible = false;
     scene.add(this.outline);
 
-    this.selectBlock(BLOCK.STONE);
     this.setupControls();
-  }
-
-  selectBlock(id) {
-    this.selected = id;
-    const name = BLOCK_TYPES[id].name;
-    this.label.textContent = `Selected: ${name[0].toUpperCase()}${name.slice(1)}`;
   }
 
   setupControls() {
@@ -49,13 +37,6 @@ export class Interaction {
 
     // Stop the browser's right-click menu popping up.
     document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    document.addEventListener('keydown', (e) => {
-      // e.code is "Digit1" ... "Digit7"
-      if (!e.code.startsWith('Digit')) return;
-      const slot = Number(e.code.slice(5)) - 1;
-      if (slot >= 0 && slot < HOTBAR.length) this.selectBlock(HOTBAR[slot]);
-    });
   }
 
   breakBlock() {
@@ -64,6 +45,8 @@ export class Interaction {
   }
 
   placeBlock() {
+    const blockId = this.hotbar.selectedBlock;
+    if (blockId === null) return; // empty hotbar slot: nothing to place
     const hit = this.raycast();
     if (!hit) return;
     // The new block goes in the space touching the face we're aiming at.
@@ -72,7 +55,7 @@ export class Interaction {
     const z = hit.z + hit.nz;
     if (this.world.getBlock(x, y, z) !== BLOCK.AIR) return;
     if (this.player.overlapsBlock(x, y, z)) return; // don't trap yourself
-    this.world.setBlock(x, y, z, this.selected);
+    this.world.setBlock(x, y, z, blockId);
   }
 
   // Called every frame: move the outline to whatever we're looking at.

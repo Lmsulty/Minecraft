@@ -1,0 +1,97 @@
+/* ==========================================================
+   Hotbar styling.
+   To restyle (e.g. an alien theme), start with these variables.
+   ========================================================== */
+:root {
+  --hotbar-slot-size: 52px;
+  --hotbar-icon-size: 38px;
+  --hotbar-gap: 4px;
+  --hotbar-bottom: 16px;                          /* distance from the bottom of the screen */
+  --hotbar-radius: 4px;
+
+  --hotbar-bg: rgba(0, 0, 0, 0.45);               /* each slot's background */
+  --hotbar-border: rgba(255, 255, 255, 0.3);
+  --hotbar-border-width: 2px;
+
+  --hotbar-selected-bg: rgba(255, 255, 255, 0.12);
+  --hotbar-selected-border: #ffffff;
+  --hotbar-selected-glow: 0 0 10px rgba(255, 255, 255, 0.55);
+  --hotbar-selected-scale: 1.08;
+
+  --hotbar-text: #ffffff;
+  --hotbar-font: system-ui, sans-serif;
+  --hotbar-name-bg: rgba(0, 0, 0, 0.55);
+}
+
+/* The whole bar */
+.hotbar {
+  position: fixed;
+  left: 50%;
+  bottom: var(--hotbar-bottom);
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--hotbar-gap);
+  pointer-events: none;
+  user-select: none;
+  font-family: var(--hotbar-font);
+  color: var(--hotbar-text);
+}
+
+/* One slot */
+.hotbar-slot {
+  position: relative;
+  width: var(--hotbar-slot-size);
+  height: var(--hotbar-slot-size);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--hotbar-bg);
+  border: var(--hotbar-border-width) solid var(--hotbar-border);
+  border-radius: var(--hotbar-radius);
+  transition: transform 0.08s, box-shadow 0.08s, border-color 0.08s;
+}
+
+/* The highlighted slot */
+.hotbar-slot.is-selected {
+  background: var(--hotbar-selected-bg);
+  border-color: var(--hotbar-selected-border);
+  box-shadow: var(--hotbar-selected-glow);
+  transform: scale(var(--hotbar-selected-scale));
+  z-index: 1;
+}
+
+/* The block picture inside a slot */
+.hotbar-icon {
+  width: var(--hotbar-icon-size);
+  height: var(--hotbar-icon-size);
+  image-rendering: pixelated; /* keep pixels sharp when resized */
+}
+
+/* Small number (1-9) in the slot's corner */
+.hotbar-key {
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+/* Block name that pops up above the bar when the selection changes */
+.hotbar-name {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  background: var(--hotbar-name-bg);
+  border-radius: var(--hotbar-radius);
+  font-size: 15px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.hotbar-name.is-visible {
+  opacity: 1;
+}

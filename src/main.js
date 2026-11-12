@@ -4,6 +4,7 @@ import { Player } from './player.js';
 import { Interaction } from './interaction.js';
 import { FpsCounter } from './fps.js';
 import { EditStore } from './storage.js';
+import { Hotbar } from './hotbar.js';
 
 // ---- Renderer: draws the 3D scene onto a <canvas> ----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -52,7 +53,9 @@ world.loadAroundNow(spawnX, spawnZ);
 player.spawn(spawnX, world.getSurfaceY(spawnX, spawnZ), spawnZ);
 
 // ---- Breaking and placing blocks ----
-const interaction = new Interaction(camera, world, player, scene, document.getElementById('selected'));
+// The hotbar's scroll wheel only works while playing (mouse captured).
+const hotbar = new Hotbar(document.getElementById('hotbar'), () => player.locked);
+const interaction = new Interaction(camera, world, player, scene, hotbar);
 
 // ---- Performance readout in the top-left corner ----
 const fps = new FpsCounter(document.getElementById('fps'), renderer, world);
