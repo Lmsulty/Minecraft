@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeRandom } from './random.js';
+import { THEME, hexToRgb } from './theme.js';
 
 // All block textures are drawn here, pixel by pixel, in code.
 // Each texture is a 16 x 16 tile. They're all packed into one image
@@ -8,6 +9,15 @@ import { makeRandom } from './random.js';
 const TILE = 16;        // pixels per tile side
 const ATLAS_TILES = 4;  // atlas is 4 x 4 tiles = 64 x 64 pixels (room for 16 textures)
 const ATLAS_SIZE = TILE * ATLAS_TILES;
+
+// ---- Colours: all come from theme.js ----
+// Turn every '#rrggbb' in THEME.textures into [r, g, b] numbers, keeping the same shape.
+function toRgb(value) {
+  if (typeof value === 'string') return hexToRgb(value);
+  if (Array.isArray(value)) return value.map(toRgb);
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toRgb(v)]));
+}
+const C = toRgb(THEME.textures);
 
 // ---- Little colour helpers ----
 
@@ -51,15 +61,14 @@ class Tile {
 // Each gets an empty tile and its own seeded random function.
 
 function paintDirt(t, rand) {
-  const browns = [[121, 85, 58], [134, 96, 66], [110, 76, 52], [128, 90, 62]];
   for (let y = 0; y < TILE; y++) {
-    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, browns));
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.dirt.base));
   }
   // Small pebbles: a few 1-3 pixel clusters, some dark, some light.
   for (let i = 0; i < 6; i++) {
     const x = Math.floor(rand() * TILE);
     const y = Math.floor(rand() * TILE);
-    const color = rand() < 0.6 ? [90, 62, 44] : [158, 124, 92];
+    const color = rand() < 0.6 ? C.dirt.pebbleDark : C.dirt.pebbleLight;
     t.set(x, y, color);
     if (rand() < 0.6) t.set(x + 1, y, color);
     if (rand() < 0.4) t.set(x, y + 1, shade(color, 0.9));
@@ -67,16 +76,15 @@ function paintDirt(t, rand) {
 }
 
 function paintGrassTop(t, rand) {
-  const greens = [[86, 150, 60], [92, 158, 64], [80, 142, 56], [98, 166, 68]];
   for (let y = 0; y < TILE; y++) {
-    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, greens));
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.grassTop.base));
   }
   // Light blade tips with a darker pixel beneath each, like little leaning blades.
   for (let i = 0; i < 14; i++) {
     const x = Math.floor(rand() * TILE);
     const y = Math.floor(rand() * TILE);
-    t.set(x, y, [128, 192, 86]);
-    t.set(x + 1, y + 1, [66, 120, 46]);
+    t.set(x, y, C.grassTop.bladeTip);
+    t.set(x + 1, y + 1, C.grassTop.bladeShadow);
   }
 }
 
@@ -88,18 +96,17 @@ function paintGrassSide(t, rand) {
     depth += Math.floor(rand() * 3) - 1; // -1, 0 or +1
     depth = Math.max(2, Math.min(5, depth));
     for (let y = 0; y < depth; y++) {
-      t.set(x, y, y === 0 ? [104, 174, 72] : pick(rand, [[86, 150, 60], [80, 142, 56]]));
+      t.set(x, y, y === 0 ? C.grassSide.bandTop : pick(rand, C.grassSide.band));
     }
-    t.set(x, depth, [62, 112, 44]); // darker edge where grass meets dirt
+    t.set(x, depth, C.grassSide.bandEdge); // darker edge where grass meets dirt
     // Occasional tuft hanging a little further down.
-    if (rand() < 0.2) t.set(x, depth + 1, [70, 122, 48]);
+    if (rand() < 0.2) t.set(x, depth + 1, C.grassSide.tuft);
   }
 }
 
 function paintStone(t, rand) {
-  const greys = [[125, 125, 131], [132, 132, 138], [119, 119, 125], [138, 138, 144]];
   for (let y = 0; y < TILE; y++) {
-    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, greys));
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.stone.base));
   }
   // Two thin cracks that wander downwards, with a lighter edge beside them.
   for (let c = 0; c < 2; c++) {
@@ -107,22 +114,22 @@ function paintStone(t, rand) {
     let y = Math.floor(rand() * TILE);
     const length = 6 + Math.floor(rand() * 4);
     for (let i = 0; i < length; i++) {
-      t.set(x, y, [92, 92, 98]);
-      t.set(x + 1, y, [150, 150, 156]);
+      t.set(x, y, C.stone.crack);
+      t.set(x + 1, y, C.stone.crackEdge);
       x += Math.floor(rand() * 3) - 1;
       y += 1;
     }
   }
   // A couple of lighter flecks.
   for (let i = 0; i < 5; i++) {
-    t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), [152, 152, 158]);
+    t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), C.stone.fleck);
   }
 }
 
 function paintWoodSide(t, rand) {
   // Bark: brown base with 4 dark grooves running up and down, wiggling a little.
   for (let y = 0; y < TILE; y++) {
-    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, [[104, 74, 48], [98, 70, 45], [110, 79, 51]]));
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.woodSide.base));
   }
   for (let g = 0; g < 4; g++) {
     const home = g * 4 + 1;
@@ -130,8 +137,8 @@ function paintWoodSide(t, rand) {
     for (let y = 0; y < TILE; y++) {
       if (rand() < 0.3) x += rand() < 0.5 ? -1 : 1;
       x = Math.max(home - 1, Math.min(home + 1, x));
-      t.set(x, y, [70, 49, 32]);
-      t.set(x + 1, y, [120, 88, 58]); // lit ridge next to the groove
+      t.set(x, y, C.woodSide.groove);
+      t.set(x + 1, y, C.woodSide.ridge); // lit ridge next to the groove
     }
   }
 }
@@ -142,13 +149,13 @@ function paintWoodTop(t, rand) {
   for (let y = 0; y < TILE; y++) {
     for (let x = 0; x < TILE; x++) {
       if (x === 0 || y === 0 || x === TILE - 1 || y === TILE - 1) {
-        t.set(x, y, pick(rand, [[86, 60, 39], [74, 52, 34]]));
+        t.set(x, y, pick(rand, C.woodTop.bark));
         continue;
       }
       const d = Math.hypot(x - centre, y - centre);
       const ring = Math.floor(d * 0.75 + rand() * 0.3) % 2;
-      let color = ring === 0 ? [186, 148, 98] : [162, 124, 79];
-      if (d < 1.2) color = [138, 102, 64]; // dark heart in the middle
+      let color = ring === 0 ? C.woodTop.ringLight : C.woodTop.ringDark;
+      if (d < 1.2) color = C.woodTop.heart; // dark heart in the middle
       t.set(x, y, shade(color, 0.96 + rand() * 0.08));
     }
   }
@@ -157,7 +164,7 @@ function paintWoodTop(t, rand) {
 function paintLeaves(t, rand) {
   // Start with deep shadow, then paint round clumps of leaves on top.
   for (let y = 0; y < TILE; y++) {
-    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, [[30, 68, 28], [36, 78, 32]]));
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.leaves.shadow));
   }
   for (let i = 0; i < 16; i++) {
     const cx = rand() * TILE;
@@ -169,7 +176,7 @@ function paintLeaves(t, rand) {
         if (d > radius) continue;
         // Lighter on the upper-left of each clump, like light from above.
         const lit = x - cx + (y - cy) < -1;
-        t.set(x, y, lit ? [78, 146, 56] : pick(rand, [[54, 114, 42], [60, 122, 46]]));
+        t.set(x, y, lit ? C.leaves.lit : pick(rand, C.leaves.clump));
       }
     }
   }
@@ -180,12 +187,12 @@ function paintSand(t, rand) {
     for (let x = 0; x < TILE; x++) {
       // Soft wavy ripples across the tile.
       const ripple = (y + Math.round(Math.sin(x * 0.7) * 1.2) + TILE) % 5 === 0;
-      const base = ripple ? [204, 186, 130] : pick(rand, [[222, 204, 148], [216, 198, 142], [227, 210, 156]]);
+      const base = ripple ? C.sand.ripple : pick(rand, C.sand.base);
       t.set(x, y, base);
     }
   }
   for (let i = 0; i < 10; i++) {
-    const color = rand() < 0.5 ? [186, 166, 114] : [240, 228, 184];
+    const color = rand() < 0.5 ? C.sand.speckDark : C.sand.speckLight;
     t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), color);
   }
 }
@@ -193,14 +200,14 @@ function paintSand(t, rand) {
 function paintPlanks(t, rand) {
   // 4 boards, each 4 pixels tall: 3 rows of wood + 1 dark seam.
   for (let b = 0; b < 4; b++) {
-    const base = shade([176, 130, 80], 0.92 + rand() * 0.12); // each board a slightly different tone
+    const base = shade(C.planks.board, 0.92 + rand() * 0.12); // each board a slightly different tone
     const joint = (b * 7 + 3 + Math.floor(rand() * 3)) % TILE; // where this board's end meets the next
     for (let row = 0; row < 4; row++) {
       const y = b * 4 + row;
       for (let x = 0; x < TILE; x++) {
         let color;
-        if (row === 3) color = [98, 68, 40];                 // seam between boards
-        else if (x === joint) color = [112, 79, 47];         // end joint
+        if (row === 3) color = C.planks.seam;                 // seam between boards
+        else if (x === joint) color = C.planks.joint;         // end joint
         else if (row === 0) color = shade(base, 1.06);       // top edge catches the light
         else color = shade(base, 0.96 + rand() * 0.08);
         t.set(x, y, color);

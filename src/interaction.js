@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BLOCK } from './blocks.js';
+import { THEME } from './theme.js';
 
 // Breaking and placing blocks: finds the block under the crosshair,
 // draws an outline around it, and handles mouse clicks.
@@ -20,7 +21,7 @@ export class Interaction {
     const box = new THREE.BoxGeometry(1.004, 1.004, 1.004);
     this.outline = new THREE.LineSegments(
       new THREE.EdgesGeometry(box),
-      new THREE.LineBasicMaterial({ color: 0x000000 })
+      new THREE.LineBasicMaterial({ color: THEME.blockOutline })
     );
     this.outline.visible = false;
     scene.add(this.outline);

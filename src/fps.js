@@ -6,14 +6,16 @@
 // - Draw calls: how many separate batches the graphics card was asked to draw
 // - Triangles:  how many triangles were drawn in the last frame
 // - Chunks:     loaded (have block data) / drawn / still waiting in the queue
+// - Time:       the in-game clock (shows x20 while time is sped up with T)
 
 const UPDATE_EVERY_MS = 500;
 
 export class FpsCounter {
-  constructor(element, renderer, world) {
+  constructor(element, renderer, world, dayNight) {
     this.element = element;
     this.renderer = renderer;
     this.world = world;
+    this.dayNight = dayNight;
     this.frames = 0;
     this.lastUpdate = performance.now();
     this.lastFrame = this.lastUpdate;
@@ -38,7 +40,8 @@ export class FpsCounter {
       `Slowest    ${this.slowest.toFixed(1)} ms\n` +
       `Draw calls ${info.calls}\n` +
       `Triangles  ${info.triangles.toLocaleString()}\n` +
-      `Chunks     ${chunks.loaded} loaded / ${chunks.drawn} drawn / ${chunks.queued} queued`;
+      `Chunks     ${chunks.loaded} loaded / ${chunks.drawn} drawn / ${chunks.queued} queued\n` +
+      `Time       ${this.dayNight.clockText()}`;
 
     this.frames = 0;
     this.slowest = 0;

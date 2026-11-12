@@ -1,6 +1,8 @@
 /* ==========================================================
-   Hotbar styling.
-   To restyle (e.g. an alien theme), start with these variables.
+   Hotbar styling: shapes and sizes.
+   COLOURS are set in src/theme.js (THEME.ui), not here:
+   --hotbar-text, --hotbar-bg, --hotbar-border, --hotbar-selected-bg,
+   --hotbar-selected-border, --hotbar-selected-glow, --hotbar-name-bg
    ========================================================== */
 :root {
   --hotbar-slot-size: 52px;
@@ -8,19 +10,9 @@
   --hotbar-gap: 4px;
   --hotbar-bottom: 16px;                          /* distance from the bottom of the screen */
   --hotbar-radius: 4px;
-
-  --hotbar-bg: rgba(0, 0, 0, 0.45);               /* each slot's background */
-  --hotbar-border: rgba(255, 255, 255, 0.3);
   --hotbar-border-width: 2px;
-
-  --hotbar-selected-bg: rgba(255, 255, 255, 0.12);
-  --hotbar-selected-border: #ffffff;
-  --hotbar-selected-glow: 0 0 10px rgba(255, 255, 255, 0.55);
   --hotbar-selected-scale: 1.08;
-
-  --hotbar-text: #ffffff;
   --hotbar-font: system-ui, sans-serif;
-  --hotbar-name-bg: rgba(0, 0, 0, 0.55);
 }
 
 /* The whole bar */

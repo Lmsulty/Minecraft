@@ -5,6 +5,11 @@ import { Interaction } from './interaction.js';
 import { FpsCounter } from './fps.js';
 import { EditStore } from './storage.js';
 import { Hotbar } from './hotbar.js';
+import { applyUiTheme } from './theme.js';
+import { DayNight } from './dayNight.js';
+
+// Interface colours (CSS variables) from theme.js, before anything is shown.
+applyUiTheme();
 
 // ---- Renderer: draws the 3D scene onto a <canvas> ----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -13,18 +18,17 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // ---- Scene: sky colour and distance fog ----
-const SKY_COLOR = 0x87ceeb;
+// The actual colours are set by the day/night cycle (dayNight.js + theme.js).
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(SKY_COLOR);
+scene.background = new THREE.Color();
 // Fades out before the edge of the loaded chunks (about 80 blocks away),
 // so the world seems to go on forever.
-scene.fog = new THREE.Fog(SKY_COLOR, 45, 78);
+scene.fog = new THREE.Fog(0xffffff, 45, 78);
 
-// ---- Lights: soft sky light + a sun, so each cube face gets a different shade ----
-scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 1.2));
-const sun = new THREE.DirectionalLight(0xffffff, 1.8);
-sun.position.set(30, 80, 20);
-scene.add(sun);
+// ---- Lights: soft sky light + a sun/moon, so each cube face gets a different shade ----
+const ambientLight = new THREE.HemisphereLight();
+const mainLight = new THREE.DirectionalLight();
+scene.add(ambientLight, mainLight, mainLight.target); // target = the spot the light points at
 
 // ---- Saving: remembers the player's block changes between visits ----
 const SEED = 12345;
@@ -45,6 +49,9 @@ scene.add(world.group);
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
 const player = new Player(camera, world, renderer.domElement, document.getElementById('overlay'));
 
+// ---- Day/night cycle (press T to speed it up) ----
+const dayNight = new DayNight(scene, camera, ambientLight, mainLight);
+
 // Spawn in the middle of chunk (0, 0). Build the ground around it right away
 // so there's something to stand on; the rest streams in over the next second.
 const spawnX = 8.5;
@@ -58,7 +65,7 @@ const hotbar = new Hotbar(document.getElementById('hotbar'), () => player.locked
 const interaction = new Interaction(camera, world, player, scene, hotbar);
 
 // ---- Performance readout in the top-left corner ----
-const fps = new FpsCounter(document.getElementById('fps'), renderer, world);
+const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight);
 
 // ---- "Reset world" button on the pause screen ----
 document.getElementById('reset').addEventListener('click', (e) => {
@@ -86,6 +93,7 @@ function loop(now) {
   world.update(player.position.x, player.position.z); // load/unload chunks, a few ms at most
   player.update(dt);
   interaction.update();
+  dayNight.update(dt); // after the player moves, so the sky is centred on the camera
   renderer.render(scene, camera);
   fps.update(); // after render, so it can read this frame's draw calls
   requestAnimationFrame(loop);
