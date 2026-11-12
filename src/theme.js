@@ -151,6 +151,7 @@ export const THEME = {
     '--hotbar-selected-border': '#ffffff',
     '--hotbar-selected-glow': '0 0 10px rgba(255, 255, 255, 0.55)',
     '--hotbar-name-bg': 'rgba(0, 0, 0, 0.55)',
+    '--hotbar-count-shadow': '1px 1px 0 #000000', // outline so counts are readable on any block
   },
 };
 

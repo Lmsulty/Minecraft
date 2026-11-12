@@ -2,7 +2,8 @@
    Hotbar styling: shapes and sizes.
    COLOURS are set in src/theme.js (THEME.ui), not here:
    --hotbar-text, --hotbar-bg, --hotbar-border, --hotbar-selected-bg,
-   --hotbar-selected-border, --hotbar-selected-glow, --hotbar-name-bg
+   --hotbar-selected-border, --hotbar-selected-glow, --hotbar-name-bg,
+   --hotbar-count-shadow
    ========================================================== */
 :root {
   --hotbar-slot-size: 52px;
@@ -67,6 +68,16 @@
   left: 4px;
   font-size: 10px;
   opacity: 0.75;
+}
+
+/* How many blocks are in the slot (bottom-right corner) */
+.hotbar-count {
+  position: absolute;
+  right: 4px;
+  bottom: 1px;
+  font-size: 13px;
+  font-weight: bold;
+  text-shadow: var(--hotbar-count-shadow);
 }
 
 /* Block name that pops up above the bar when the selection changes */

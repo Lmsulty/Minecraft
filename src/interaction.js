@@ -1,19 +1,21 @@
 import * as THREE from 'three';
-import { BLOCK, isBreakableId } from './blocks.js';
+import { BLOCK, isBreakableId, dropId } from './blocks.js';
 import { THEME } from './theme.js';
 
 // Breaking and placing blocks: finds the block under the crosshair,
 // draws an outline around it, and handles mouse clicks.
 // Which block gets placed comes from the hotbar (hotbar.js).
+// Broken blocks go into the inventory; placing a block uses one up.
 
 const REACH = 5; // how far away (in blocks) you can break/place
 
 export class Interaction {
-  constructor(camera, world, player, scene, hotbar) {
+  constructor(camera, world, player, scene, hotbar, inventory) {
     this.camera = camera;
     this.world = world;
     this.player = player;
     this.hotbar = hotbar;
+    this.inventory = inventory;
     this.direction = new THREE.Vector3();
 
     // Wireframe box drawn around the targeted block. Slightly bigger
@@ -43,8 +45,11 @@ export class Interaction {
   breakBlock() {
     const hit = this.raycast();
     if (!hit) return;
-    if (!isBreakableId(this.world.getBlock(hit.x, hit.y, hit.z))) return; // e.g. the core rock floor
-    this.world.setBlock(hit.x, hit.y, hit.z, BLOCK.AIR);
+    const blockId = this.world.getBlock(hit.x, hit.y, hit.z);
+    if (!isBreakableId(blockId)) return; // e.g. the core rock floor
+    if (!this.world.setBlock(hit.x, hit.y, hit.z, BLOCK.AIR)) return; // chunk not loaded
+    // Collect it. If the inventory is full, the block is simply lost.
+    this.inventory.add(dropId(blockId));
   }
 
   placeBlock() {
@@ -58,7 +63,10 @@ export class Interaction {
     const z = hit.z + hit.nz;
     if (this.world.getBlock(x, y, z) !== BLOCK.AIR) return;
     if (this.player.overlapsBlock(x, y, z)) return; // don't trap yourself
-    this.world.setBlock(x, y, z, blockId);
+    // Only use one up if the block really went in.
+    if (this.world.setBlock(x, y, z, blockId)) {
+      this.inventory.removeFromSlot(this.hotbar.selected, 1);
+    }
   }
 
   // Called every frame: move the outline to whatever we're looking at.

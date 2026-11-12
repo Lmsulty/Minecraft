@@ -7,6 +7,7 @@ import { Interaction } from './interaction.js';
 import { FpsCounter } from './fps.js';
 import { EditStore } from './storage.js';
 import { Hotbar } from './hotbar.js';
+import { Inventory } from './inventory.js';
 import { applyUiTheme } from './theme.js';
 import { DayNight } from './dayNight.js';
 
@@ -36,12 +37,15 @@ scene.add(ambientLight, mainLight, mainLight.target); // target = the spot the l
 const SEED = 12345;
 const savedMessage = document.getElementById('saved');
 let hideSavedTimer = null;
-const editStore = new EditStore(SEED, () => {
+function flashSaved() {
   // Flash "Saved" in the corner for a second.
   savedMessage.classList.add('show');
   clearTimeout(hideSavedTimer);
   hideSavedTimer = setTimeout(() => savedMessage.classList.remove('show'), 1000);
-});
+}
+const editStore = new EditStore(SEED, flashSaved);
+// What the player is carrying. A new world starts with an empty inventory.
+const inventory = new Inventory(SEED, flashSaved);
 
 // ---- World: chunks load and unload around the player as they move ----
 const world = new World(SEED, editStore);
@@ -87,8 +91,8 @@ function findSpawn(x, z) {
 
 // ---- Breaking and placing blocks ----
 // The hotbar's scroll wheel only works while playing (mouse captured).
-const hotbar = new Hotbar(document.getElementById('hotbar'), () => player.locked);
-const interaction = new Interaction(camera, world, player, scene, hotbar);
+const hotbar = new Hotbar(document.getElementById('hotbar'), inventory, () => player.locked);
+const interaction = new Interaction(camera, world, player, scene, hotbar, inventory);
 
 // ---- Performance readout in the top-left corner ----
 const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight, player);
@@ -96,8 +100,9 @@ const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayN
 // ---- "Reset world" button on the pause screen ----
 document.getElementById('reset').addEventListener('click', (e) => {
   e.stopPropagation(); // don't also count as "click to play"
-  if (!confirm('Reset the world? All your changes will be lost.')) return;
+  if (!confirm('Reset the world? All your changes and your inventory will be lost.')) return;
   editStore.clear();
+  inventory.clear();
   location.reload(); // start fresh: the world regenerates from the seed
 });
 

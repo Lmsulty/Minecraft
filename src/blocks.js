@@ -21,11 +21,13 @@ export const BLOCK = {
 //               'cutout' = some pixels are fully see-through (e.g. gaps between leaves).
 // - blocksLight: does it stop sunlight from spreading into caves? (leaves let light through)
 // - breakable:  can the player break it? (missing = yes)
+// - drops:      which block you collect when you break it (missing = the block itself)
 // - textures:   which tile in the atlas (textures.js) each face uses: top, side, bottom.
 export const BLOCK_TYPES = [
   { id: BLOCK.AIR,   name: 'air',   solid: false, opaque: false, blocksLight: false },
   {
     id: BLOCK.GRASS, name: 'grass', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
+    drops: BLOCK.DIRT,
     textures: { top: 'grass_top', side: 'grass_side', bottom: 'dirt' },
   },
   {
@@ -76,4 +78,9 @@ export function blocksLightId(id) {
 
 export function isBreakableId(id) {
   return BLOCK_TYPES[id]?.breakable ?? true;
+}
+
+// The block you collect when you break block `id`.
+export function dropId(id) {
+  return BLOCK_TYPES[id]?.drops ?? id;
 }

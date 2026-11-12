@@ -1,16 +1,12 @@
 import './hotbar.css';
-import { BLOCK, BLOCK_TYPES } from './blocks.js';
+import { BLOCK_TYPES } from './blocks.js';
 import { makeBlockIcon } from './blockIcons.js';
+import { HOTBAR_SIZE } from './inventory.js';
 
 // The row of 9 block slots at the bottom of the screen.
 // Number keys 1-9 or the scroll wheel pick a slot.
-// Other code reads `hotbar.selectedBlock` to know what to place.
-
-// What's in each slot. null = empty. Edit this list to change the hotbar.
-const SLOTS = [
-  BLOCK.GRASS, BLOCK.DIRT, BLOCK.STONE, BLOCK.WOOD,
-  BLOCK.LEAVES, BLOCK.SAND, BLOCK.PLANKS, null, null,
-];
+// What's IN each slot comes from the inventory (inventory.js): the hotbar is
+// just a view of the inventory's first 9 slots, with a count on each.
 
 // ---- Scroll wheel tuning ----
 // Trackpads send lots of tiny scroll events per swipe; a mouse wheel sends one big one
@@ -24,11 +20,11 @@ const NAME_SHOW_MS = 1500;     // how long the block name stays up after switchi
 
 export class Hotbar {
   // container: the empty <div> to build the hotbar in
+  // inventory: the Inventory whose first 9 slots this shows
   // isActive:  function that says whether the game is being played (mouse captured)
-  constructor(container, isActive) {
+  constructor(container, inventory, isActive) {
+    this.inventory = inventory;
     this.isActive = isActive;
-    this.slots = SLOTS.slice();
-    this.selected = 0;
 
     this.wheelTotal = 0;
     this.lastWheel = 0;
@@ -36,51 +32,79 @@ export class Hotbar {
     this.nameTimer = null;
 
     this.build(container);
-    this.select(0, { showName: false });
+    this.refresh();
+    // Redraw whenever the inventory changes (block picked up, placed, ...).
+    inventory.onChange(() => this.refresh());
     this.setupControls();
+  }
+
+  // The selected slot number (0-8).
+  get selected() {
+    return this.inventory.selected;
   }
 
   // The block id in the selected slot, or null if that slot is empty.
   get selectedBlock() {
-    return this.slots[this.selected];
+    return this.inventory.selectedStack?.block ?? null;
   }
 
   // ---- Building the HTML ----
 
   build(container) {
     container.classList.add('hotbar');
-    this.slotElements = this.slots.map((blockId, i) => {
+    this.slotElements = [];
+    for (let i = 0; i < HOTBAR_SIZE; i++) {
       const slot = document.createElement('div');
       slot.className = 'hotbar-slot';
-
-      if (blockId !== null) {
-        const icon = makeBlockIcon(blockId);
-        icon.className = 'hotbar-icon';
-        slot.appendChild(icon);
-      }
 
       const key = document.createElement('span');
       key.className = 'hotbar-key';
       key.textContent = i + 1;
-      slot.appendChild(key);
 
+      const count = document.createElement('span');
+      count.className = 'hotbar-count';
+
+      slot.append(key, count);
       container.appendChild(slot);
-      return slot;
-    });
+      // shownBlock remembers which icon is drawn, so we only redraw icons that changed.
+      this.slotElements.push({ slot, count, icon: null, shownBlock: null });
+    }
 
     this.nameElement = document.createElement('div');
     this.nameElement.className = 'hotbar-name';
     container.appendChild(this.nameElement);
   }
 
+  // Make every slot match the inventory: icon, count, and highlight.
+  refresh() {
+    this.slotElements.forEach((el, i) => {
+      const stack = this.inventory.get(i);
+      const blockId = stack ? stack.block : null;
+
+      // Swap the icon only if the block in this slot changed.
+      if (blockId !== el.shownBlock) {
+        el.icon?.remove();
+        el.icon = null;
+        if (blockId !== null) {
+          el.icon = makeBlockIcon(blockId);
+          el.icon.className = 'hotbar-icon';
+          el.slot.prepend(el.icon);
+        }
+        el.shownBlock = blockId;
+      }
+
+      // Show the count (blank for an empty slot).
+      el.count.textContent = stack ? stack.count : '';
+      el.slot.classList.toggle('is-selected', i === this.selected);
+    });
+  }
+
   // ---- Choosing a slot ----
 
   select(index, { showName = true } = {}) {
     // Wrap around: past slot 9 goes back to 1, and before 1 goes to 9.
-    const count = this.slots.length;
-    this.selected = ((index % count) + count) % count;
-
-    this.slotElements.forEach((el, i) => el.classList.toggle('is-selected', i === this.selected));
+    this.inventory.select(((index % HOTBAR_SIZE) + HOTBAR_SIZE) % HOTBAR_SIZE);
+    this.refresh(); // in case the slot didn't change (no change event)
     if (showName) this.showName();
   }
 
@@ -100,7 +124,7 @@ export class Hotbar {
       // e.code is "Digit1" ... "Digit9"
       if (!e.code.startsWith('Digit')) return;
       const index = Number(e.code.slice(5)) - 1;
-      if (index >= 0 && index < this.slots.length) this.select(index);
+      if (index >= 0 && index < HOTBAR_SIZE) this.select(index);
     });
 
     document.addEventListener('wheel', (e) => this.onWheel(e), { passive: true });
