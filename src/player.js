@@ -81,6 +81,13 @@ export class Player {
   // ---- Every frame ----
 
   update(dt) {
+    // The ground under us hasn't loaded yet (e.g. right after starting):
+    // wait in place instead of falling through the world.
+    if (!this.world.isLoadedAt(this.position.x, this.position.z)) {
+      this.updateCamera();
+      return;
+    }
+
     // Walking: work out which way WASD points, relative to where we're looking.
     let forward = 0;
     let strafe = 0;
@@ -121,7 +128,7 @@ export class Player {
       this.moveAxis('y', dy / steps);
     }
 
-    // Fell off the edge of the world? Back to the start.
+    // Fell out of the bottom of the world? Back to the start.
     if (this.position.y < -30) {
       this.spawn(this.spawnPoint.x, this.spawnPoint.y, this.spawnPoint.z);
     }
