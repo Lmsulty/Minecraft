@@ -174,6 +174,17 @@ export class Player {
     return false;
   }
 
+  // Would a block at (bx, by, bz) overlap the player's body?
+  // Used to stop you placing a block inside yourself.
+  overlapsBlock(bx, by, bz) {
+    const p = this.position;
+    return (
+      p.x - HALF_WIDTH < bx + 1 && p.x + HALF_WIDTH > bx &&
+      p.y < by + 1 && p.y + HEIGHT > by &&
+      p.z - HALF_WIDTH < bz + 1 && p.z + HALF_WIDTH > bz
+    );
+  }
+
   updateCamera() {
     this.camera.position.set(this.position.x, this.position.y + EYE_HEIGHT, this.position.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0);

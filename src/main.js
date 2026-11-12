@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { Player } from './player.js';
+import { Interaction } from './interaction.js';
 
 // ---- Renderer: draws the 3D scene onto a <canvas> ----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -34,6 +35,9 @@ const spawnX = 32.5;
 const spawnZ = 32.5;
 player.spawn(spawnX, world.getSurfaceY(spawnX, spawnZ), spawnZ);
 
+// ---- Breaking and placing blocks ----
+const interaction = new Interaction(camera, world, player, scene, document.getElementById('selected'));
+
 // ---- Keep the picture the right shape when the window resizes ----
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -50,6 +54,7 @@ function loop(now) {
   lastTime = now;
 
   player.update(dt);
+  interaction.update();
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }

@@ -88,6 +88,39 @@ export class World {
     return isSolidId(this.getBlock(x, y, z));
   }
 
+  // ---- Changing blocks ----
+
+  // Change one block and redraw only the chunks that could look different.
+  // Returns true if the block was changed.
+  setBlock(x, y, z, id) {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    z = Math.floor(z);
+    if (y < 0 || y >= WORLD_HEIGHT) return false;
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const chunk = this.getChunk(cx, cz);
+    if (!chunk) return false; // outside the generated world
+
+    const lx = x - cx * CHUNK_SIZE;
+    const lz = z - cz * CHUNK_SIZE;
+    if (chunk.get(lx, y, lz) === id) return false;
+    chunk.set(lx, y, lz, id);
+
+    // Always rebuild this chunk. If the block sits on a chunk edge, the
+    // neighbouring chunk may have blocks that were hidden (or uncovered)
+    // by this one, so rebuild that too. A corner block touches two neighbours.
+    const toRebuild = [chunk];
+    if (lx === 0) toRebuild.push(this.getChunk(cx - 1, cz));
+    if (lx === CHUNK_SIZE - 1) toRebuild.push(this.getChunk(cx + 1, cz));
+    if (lz === 0) toRebuild.push(this.getChunk(cx, cz - 1));
+    if (lz === CHUNK_SIZE - 1) toRebuild.push(this.getChunk(cx, cz + 1));
+    for (const c of toRebuild) {
+      if (c) this.updateChunkMesh(c); // neighbour may not exist at the world's edge
+    }
+    return true;
+  }
+
   // Y of the first air block above the ground at column (x, z).
   getSurfaceY(x, z) {
     for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
