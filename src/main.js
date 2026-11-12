@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { World } from './world.js';
+import { Player } from './player.js';
 
 // ---- Renderer: draws the 3D scene onto a <canvas> ----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -24,10 +25,14 @@ const world = new World(12345);
 world.generate();
 scene.add(world.group);
 
-// ---- Camera: fixed overview for now (the player controls it in step 3) ----
+// ---- Camera + player: the player moves the camera around ----
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
-camera.position.set(-20, 45, -20);
-camera.lookAt(32, 12, 32); // centre of the 64 x 64 world
+const player = new Player(camera, world, renderer.domElement, document.getElementById('overlay'));
+
+// Start standing on the ground in the middle of the world.
+const spawnX = 32.5;
+const spawnZ = 32.5;
+player.spawn(spawnX, world.getSurfaceY(spawnX, spawnZ), spawnZ);
 
 // ---- Keep the picture the right shape when the window resizes ----
 window.addEventListener('resize', () => {
@@ -37,8 +42,15 @@ window.addEventListener('resize', () => {
 });
 
 // ---- Game loop: runs about 60 times per second ----
-function loop() {
+let lastTime = performance.now();
+function loop(now) {
+  // dt = seconds since last frame. Capped so a long pause (e.g. switching
+  // tabs) doesn't make the player teleport or fall through the floor.
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  player.update(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
