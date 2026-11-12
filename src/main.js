@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
+import { SPAWN } from './terrain.js';
+import { BLOCK } from './blocks.js';
 import { Player } from './player.js';
 import { Interaction } from './interaction.js';
 import { FpsCounter } from './fps.js';
@@ -52,12 +54,36 @@ const player = new Player(camera, world, renderer.domElement, document.getElemen
 // ---- Day/night cycle (press T to speed it up) ----
 const dayNight = new DayNight(scene, camera, ambientLight, mainLight);
 
-// Spawn in the middle of chunk (0, 0). Build the ground around it right away
+// Spawn near the middle of chunk (0, 0). Build the ground around it right away
 // so there's something to stand on; the rest streams in over the next second.
-const spawnX = 8.5;
-const spawnZ = 8.5;
-world.loadAroundNow(spawnX, spawnZ);
-player.spawn(spawnX, world.getSurfaceY(spawnX, spawnZ), spawnZ);
+world.loadAroundNow(SPAWN.x + 0.5, SPAWN.z + 0.5);
+const spawn = findSpawn(SPAWN.x, SPAWN.z);
+player.spawn(spawn.x, spawn.y, spawn.z);
+// Start looking at the starter sinkhole, so a new player sees a cave straight away.
+const starter = world.terrain.starter;
+const toStarter = Math.hypot(starter.x - spawn.x, starter.z - spawn.z);
+player.yaw = Math.atan2(-(starter.x - spawn.x), -(starter.z - spawn.z));
+player.pitch = -Math.atan2(spawn.y + 1.62 - starter.top, toStarter); // aim at the middle of the hole
+player.updateCamera();
+
+// Find a safe spot to stand: untouched grass with two blocks of air above
+// (not inside a cave opening). Searches in growing squares around (x, z).
+function findSpawn(x, z) {
+  for (let r = 0; r <= 12; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // only the ring's edge
+        const h = world.terrain.height(x + dx, z + dz);
+        if (world.getBlock(x + dx, h, z + dz) === BLOCK.GRASS &&
+            !world.isSolid(x + dx, h + 1, z + dz) &&
+            !world.isSolid(x + dx, h + 2, z + dz)) {
+          return { x: x + dx + 0.5, y: h + 1, z: z + dz + 0.5 };
+        }
+      }
+    }
+  }
+  return { x: x + 0.5, y: world.getSurfaceY(x, z), z: z + 0.5 }; // fallback
+}
 
 // ---- Breaking and placing blocks ----
 // The hotbar's scroll wheel only works while playing (mouse captured).
@@ -65,7 +91,7 @@ const hotbar = new Hotbar(document.getElementById('hotbar'), () => player.locked
 const interaction = new Interaction(camera, world, player, scene, hotbar);
 
 // ---- Performance readout in the top-left corner ----
-const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight);
+const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight, player);
 
 // ---- "Reset world" button on the pause screen ----
 document.getElementById('reset').addEventListener('click', (e) => {

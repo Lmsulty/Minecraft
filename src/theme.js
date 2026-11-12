@@ -46,6 +46,11 @@ export const THEME = {
   // ---- In the world ----
   blockOutline: '#000000', // box around the block you're aiming at
 
+  // How dark caves get where no sunlight reaches. Blocks are tinted from this
+  // colour (no light at all) up to full brightness (open sky). An alien theme
+  // could make this a faint glow, e.g. '#183020'.
+  caveLight: '#2c2c38',
+
   // ---- Block textures (see textures.js for the patterns) ----
   // Lists like base: [...] are picked from at random, pixel by pixel.
   // Keep each list the same length if you want the same pattern with new colours.
@@ -98,6 +103,11 @@ export const THEME = {
       board: '#b08250',    // each board is this, made slightly lighter or darker
       seam: '#624428',     // dark line between boards
       joint: '#704f2f',    // where two boards meet end to end
+    },
+    core: {                // unbreakable rock at the bottom of the world
+      base: ['#2e2c33', '#34313a', '#29272d', '#38353f'],
+      vein: '#4d4856',     // pale streaks running across it
+      speck: '#1c1a20',
     },
   },
 

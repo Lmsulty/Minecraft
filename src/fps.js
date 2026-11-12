@@ -7,15 +7,17 @@
 // - Triangles:  how many triangles were drawn in the last frame
 // - Chunks:     loaded (have block data) / drawn / still waiting in the queue
 // - Time:       the in-game clock (shows x20 while time is sped up with T)
+// - Position:   where you are standing (X and Z across the ground, Y = height)
 
 const UPDATE_EVERY_MS = 500;
 
 export class FpsCounter {
-  constructor(element, renderer, world, dayNight) {
+  constructor(element, renderer, world, dayNight, player) {
     this.element = element;
     this.renderer = renderer;
     this.world = world;
     this.dayNight = dayNight;
+    this.player = player;
     this.frames = 0;
     this.lastUpdate = performance.now();
     this.lastFrame = this.lastUpdate;
@@ -41,10 +43,17 @@ export class FpsCounter {
       `Draw calls ${info.calls}\n` +
       `Triangles  ${info.triangles.toLocaleString()}\n` +
       `Chunks     ${chunks.loaded} loaded / ${chunks.drawn} drawn / ${chunks.queued} queued\n` +
-      `Time       ${this.dayNight.clockText()}`;
+      `Time       ${this.dayNight.clockText()}\n` +
+      `Position   ${this.positionText()}`;
 
     this.frames = 0;
     this.slowest = 0;
     this.lastUpdate = now;
+  }
+
+  // e.g. "X 12  Y 50  Z -30" (the block you're standing in)
+  positionText() {
+    const p = this.player.position;
+    return `X ${Math.floor(p.x)}  Y ${Math.floor(p.y)}  Z ${Math.floor(p.z)}`;
   }
 }

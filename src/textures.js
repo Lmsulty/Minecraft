@@ -225,6 +225,25 @@ function paintPlanks(t, rand) {
   }
 }
 
+function paintCore(t, rand) {
+  // Dark, dense rock with pale streaks running sideways through it.
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.core.base));
+  }
+  for (let v = 0; v < 3; v++) {
+    let y = Math.floor(rand() * TILE);
+    const x0 = Math.floor(rand() * TILE);
+    const length = 6 + Math.floor(rand() * 7);
+    for (let x = x0; x < x0 + length; x++) {
+      t.set(x, y, C.core.vein);
+      if (rand() < 0.25) y += rand() < 0.5 ? -1 : 1; // streaks wander a little
+    }
+  }
+  for (let i = 0; i < 8; i++) {
+    t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), C.core.speck);
+  }
+}
+
 // ---- Atlas layout ----
 // Order here = position in the atlas (left to right, then next row).
 // Names must match the `textures` entries in blocks.js.
@@ -238,6 +257,7 @@ const PAINTERS = {
   leaves: paintLeaves,
   sand: paintSand,
   planks: paintPlanks,
+  core: paintCore,
 };
 const TILE_NAMES = Object.keys(PAINTERS);
 

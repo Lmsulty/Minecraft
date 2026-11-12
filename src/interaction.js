@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCK } from './blocks.js';
+import { BLOCK, isBreakableId } from './blocks.js';
 import { THEME } from './theme.js';
 
 // Breaking and placing blocks: finds the block under the crosshair,
@@ -42,7 +42,9 @@ export class Interaction {
 
   breakBlock() {
     const hit = this.raycast();
-    if (hit) this.world.setBlock(hit.x, hit.y, hit.z, BLOCK.AIR);
+    if (!hit) return;
+    if (!isBreakableId(this.world.getBlock(hit.x, hit.y, hit.z))) return; // e.g. the core rock floor
+    this.world.setBlock(hit.x, hit.y, hit.z, BLOCK.AIR);
   }
 
   placeBlock() {

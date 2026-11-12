@@ -12,7 +12,8 @@ const SAVE_DELAY_MS = 1000; // save this long after the last change, not on ever
 export class EditStore {
   constructor(seed, onSaved) {
     // The seed is part of the name, so edits never land on different terrain.
-    this.storageKey = `voxelgame.edits.seed${seed}.v1`;
+    // v2: the world got taller and gained caves, so v1 edits no longer line up.
+    this.storageKey = `voxelgame.edits.seed${seed}.v2`;
     this.onSaved = onSaved; // called after each successful save (for the "Saved" message)
     this.edits = new Map();
     this.dirty = false;     // true = there are changes not saved yet
