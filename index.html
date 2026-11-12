@@ -46,6 +46,19 @@
         pointer-events: none;
         text-shadow: 0 0 2px #000;
       }
+      #fps {
+        position: fixed;
+        left: 8px;
+        top: 8px;
+        padding: 6px 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font: 13px/1.4 monospace;
+        white-space: pre;
+        border-radius: 4px;
+        pointer-events: none;
+        z-index: 1;
+      }
       #selected {
         position: fixed;
         left: 50%;
@@ -63,6 +76,7 @@
   <body>
     <div id="crosshair">+</div>
     <div id="selected"></div>
+    <div id="fps"></div>
     <div id="overlay">
       <h1>Click to play</h1>
       <p>WASD move · Mouse look · Space jump · Esc pause</p>

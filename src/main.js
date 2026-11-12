@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { World } from './world.js';
 import { Player } from './player.js';
 import { Interaction } from './interaction.js';
+import { FpsCounter } from './fps.js';
 
 // ---- Renderer: draws the 3D scene onto a <canvas> ----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -38,6 +39,9 @@ player.spawn(spawnX, world.getSurfaceY(spawnX, spawnZ), spawnZ);
 // ---- Breaking and placing blocks ----
 const interaction = new Interaction(camera, world, player, scene, document.getElementById('selected'));
 
+// ---- Performance readout in the top-left corner ----
+const fps = new FpsCounter(document.getElementById('fps'), renderer);
+
 // ---- Keep the picture the right shape when the window resizes ----
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -56,6 +60,7 @@ function loop(now) {
   player.update(dt);
   interaction.update();
   renderer.render(scene, camera);
+  fps.update(); // after render, so it can read this frame's draw calls
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

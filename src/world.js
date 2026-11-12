@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { createNoise2D } from 'simplex-noise';
 import { BLOCK, BLOCK_TYPES, isSolidId } from './blocks.js';
+import { makeRandom } from './random.js';
+import { createAtlasTexture, getTileUV } from './textures.js';
 
 // ---- World size settings ----
 export const CHUNK_SIZE = 16;    // chunk width and depth, in blocks
@@ -11,19 +13,6 @@ const WORLD_CHUNKS = 4;          // 4 x 4 chunks = 64 x 64 blocks
 const BASE_HEIGHT = 16;  // average ground level
 const HILL_HEIGHT = 8;   // how far hills rise/fall from the average
 const DIRT_DEPTH = 3;    // dirt layers under the grass
-
-// A small seeded random-number generator (mulberry32).
-// Same seed -> same numbers -> same world every time.
-function makeRandom(seed) {
-  let a = seed >>> 0;
-  return function () {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // One 16 x WORLD_HEIGHT x 16 piece of the world.
 class Chunk {
@@ -48,10 +37,32 @@ class Chunk {
   }
 }
 
-// One cube shape and one material per block type, shared by every chunk.
-const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-const materials = BLOCK_TYPES.map((type) =>
-  type.solid ? new THREE.MeshLambertMaterial({ color: type.color }) : null
+// One material for every block: it uses the texture atlas.
+const blockMaterial = new THREE.MeshLambertMaterial({ map: createAtlasTexture() });
+
+// One cube shape per block type, with each face pointing at the right
+// tile in the atlas. Shared by every chunk.
+// (Temporary: merged chunk meshes will replace these cubes in the next step.)
+function makeBlockGeometry(textures) {
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  // BoxGeometry stores its 6 faces in this order, 4 corners each:
+  // +x (east), -x (west), +y (top), -y (bottom), +z (south), -z (north)
+  const faceTiles = [
+    textures.side, textures.side, textures.top,
+    textures.bottom, textures.side, textures.side,
+  ];
+  const uv = geometry.attributes.uv;
+  faceTiles.forEach((name, face) => {
+    const t = getTileUV(name);
+    for (let i = face * 4; i < face * 4 + 4; i++) {
+      // Each corner's UV starts as 0 or 1 (the whole image). Squeeze it into the tile.
+      uv.setXY(i, t.u0 + uv.getX(i) * (t.u1 - t.u0), t.v0 + uv.getY(i) * (t.v1 - t.v0));
+    }
+  });
+  return geometry;
+}
+const blockGeometries = BLOCK_TYPES.map((type) =>
+  type.solid ? makeBlockGeometry(type.textures) : null
 );
 
 export class World {
@@ -212,7 +223,7 @@ function buildChunkMesh(world, chunk) {
   positions.forEach((list, id) => {
     if (list.length === 0) return;
     const count = list.length / 3;
-    const mesh = new THREE.InstancedMesh(cubeGeometry, materials[id], count);
+    const mesh = new THREE.InstancedMesh(blockGeometries[id], blockMaterial, count);
     for (let i = 0; i < count; i++) {
       // +0.5 so block (x, y, z) fills the space x..x+1, y..y+1, z..z+1
       matrix.makeTranslation(list[i * 3] + 0.5, list[i * 3 + 1] + 0.5, list[i * 3 + 2] + 0.5);
