@@ -47,7 +47,7 @@ export const THEME = {
   // ---- Space station: the world is drawn as the inside of a cylinder (curve.js) ----
   // Only the drawing bends; walking, building and saving stay flat.
   station: {
-    curveRadius: 128,     // blocks from the ground to the middle of the cylinder.
+    curveRadius: 96,     // blocks from the ground to the middle of the cylinder.
                           // Smaller = stronger curve (96 is dramatic, 192 is subtle).
                           // Must stay bigger than the build height above ground.
     curveGroundLevel: 48, // the height that bends at exactly that radius
@@ -58,7 +58,7 @@ export const THEME = {
     hazeStart: 28,        // fully clear up to here
     hazeEnd: 78,          // fully hazed from here. Must stay at or below ~78,
                           // or you'd see the edge of the loaded world.
-    hazeCurve: 2,         // 1 = fades evenly. Bigger = stays clear longer, then
+    hazeCurve: 3,         // 1 = fades evenly. Bigger = stays clear longer, then
                           // fades quickly near the end (so the rising land shows).
     hazeMax: 1,           // how hazy the farthest land gets (1 = disappears).
                           // Lowered later, once the far side of the cylinder is drawn.
