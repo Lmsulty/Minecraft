@@ -11,6 +11,10 @@ export const BLOCK = {
   SAND: 6,
   PLANKS: 7,
   CORE: 8,   // unbreakable floor at the bottom of the world
+  // Crafted only (never generated in the world, see recipes.js):
+  STONE_BRICKS: 9,
+  GLOW_LAMP: 10,
+  GLASS: 11,
 };
 
 // Indexed by block id.
@@ -18,10 +22,12 @@ export const BLOCK = {
 // - opaque:     does it completely hide the faces of blocks behind it?
 //               Something like see-through leaves would be solid but NOT opaque.
 // - renderType: 'opaque' = every pixel is solid colour.
-//               'cutout' = some pixels are fully see-through (e.g. gaps between leaves).
+//               'cutout' = some pixels are fully see-through (e.g. gaps between leaves, glass).
+//               'glow'   = always fully bright, even at night (e.g. the glow lamp).
 // - blocksLight: does it stop sunlight from spreading into caves? (leaves let light through)
 // - breakable:  can the player break it? (missing = yes)
 // - drops:      which block you collect when you break it (missing = the block itself)
+// - emitsLight: lights up dark places around it, like caves (missing = no)
 // - textures:   which tile in the atlas (textures.js) each face uses: top, side, bottom.
 export const BLOCK_TYPES = [
   { id: BLOCK.AIR,   name: 'air',   solid: false, opaque: false, blocksLight: false },
@@ -61,6 +67,21 @@ export const BLOCK_TYPES = [
     id: BLOCK.CORE, name: 'core rock', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
     breakable: false,
     textures: { top: 'core', side: 'core', bottom: 'core' },
+  },
+  {
+    id: BLOCK.STONE_BRICKS, name: 'stone bricks', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
+    textures: { top: 'stone_bricks', side: 'stone_bricks', bottom: 'stone_bricks' },
+  },
+  {
+    // Lights up caves around it, and stays bright at night.
+    id: BLOCK.GLOW_LAMP, name: 'glow lamp', solid: true, opaque: true, renderType: 'glow', blocksLight: true,
+    emitsLight: true,
+    textures: { top: 'glow_lamp', side: 'glow_lamp', bottom: 'glow_lamp' },
+  },
+  {
+    // See-through: you can look through the middle of each face, and sunlight passes through.
+    id: BLOCK.GLASS, name: 'glass', solid: true, opaque: false, renderType: 'cutout', blocksLight: false,
+    textures: { top: 'glass', side: 'glass', bottom: 'glass' },
   },
 ];
 

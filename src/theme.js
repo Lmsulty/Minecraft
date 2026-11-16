@@ -129,6 +129,24 @@ export const THEME = {
       vein: '#4d4856',     // pale streaks running across it
       speck: '#1c1a20',
     },
+    // ---- Crafted-only blocks ----
+    stoneBricks: {
+      base: ['#8a8a92', '#84848c', '#90909a'],
+      highlight: '#a2a2aa', // top row of each brick
+      mortar: '#55555c',    // lines between bricks
+      chip: '#6c6c74',
+    },
+    glowLamp: {
+      frame: '#3a2a1c',     // outer edge
+      frameLight: '#5e4430',// inner edge and the cross between panes
+      glow: ['#ffcc5a', '#ffd46e', '#f7c050'],
+      core: '#fff1b8',      // brightest middle
+    },
+    glass: {
+      frame: '#d8eef4',     // top and left edges
+      frameShade: '#9cc0cc',// bottom and right edges
+      shine: '#f4fcff',     // streaks of reflection (the rest of the pane is see-through)
+    },
   },
 
   // ---- Interface (pause screen, FPS box, hotbar...) ----

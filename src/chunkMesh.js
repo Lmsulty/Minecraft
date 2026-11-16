@@ -11,7 +11,9 @@ import { THEME, hexToRgb } from './theme.js';
 //   1. Air that can see straight up to the sky gets full light.
 //   2. That light spreads sideways and downwards through air, one step
 //      dimmer per block, for LIGHT_SPREAD blocks (so cave mouths fade smoothly).
-//   3. Each face is tinted by the light in the air just in front of it.
+//   3. Blocks that give off light (like the glow lamp) light up the air
+//      around them the same way, fading over LIGHT_SPREAD blocks.
+//   4. Each face is tinted by the light in the air just in front of it.
 // This all happens once, when the chunk is built. It costs nothing per frame.
 
 // How many blocks sunlight spreads from open sky before it's fully dark.
@@ -26,6 +28,8 @@ const MATERIALS = {
   // See-through-pixel blocks (e.g. leaves later): pixels with alpha below 0.5
   // are simply not drawn, so you see through the gaps.
   cutout: new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: 0.5 }),
+  // Glowing blocks: ignore the sun and moon, so they look lit even at night.
+  glow: new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true }),
 };
 
 // ---- Brightness for each light level ----
@@ -46,6 +50,7 @@ const BRIGHTNESS = (() => {
 // Fast lookups by block id (faster than calling a function per block).
 const IS_OPAQUE = Uint8Array.from(BLOCK_TYPES, (t) => (t.opaque ? 1 : 0));
 const BLOCKS_LIGHT = Uint8Array.from(BLOCK_TYPES, (t) => (t.blocksLight ? 1 : 0));
+const EMITS_LIGHT = Uint8Array.from(BLOCK_TYPES, (t) => (t.emitsLight ? 1 : 0));
 
 // ---- The 6 faces of a block ----
 // For each face:
@@ -170,11 +175,23 @@ function computeLight({ blocks, size, layer }, worldHeight) {
     for (let y = top + 1; y < worldHeight; y++) light[col + y * layer] = LIGHT_SPREAD;
   }
 
-  // 2b. Start spreading from sky blocks that sit next to a darker air block
-  //     (e.g. beside a cliff or above a cave mouth). Only these can spread light.
   const queue = scratchArray('queue', Int32Array, total);
   let head = 0;
   let tail = 0;
+
+  // 2b. Glowing blocks (e.g. the glow lamp) spread light too. Each one counts
+  //     as one level brighter than open sky, so the air touching it gets full
+  //     light. They go in the queue FIRST: brightest first means every air
+  //     block gets its final light the first time it's reached.
+  for (let i = 0; i < total; i++) {
+    if (EMITS_LIGHT[blocks[i]]) {
+      light[i] = LIGHT_SPREAD + 1;
+      queue[tail++] = i;
+    }
+  }
+
+  // 2c. Start spreading from sky blocks that sit next to a darker air block
+  //     (e.g. beside a cliff or above a cave mouth). Only these can spread light.
   for (let rz = 0; rz < size; rz++) {
     for (let rx = 0; rx < size; rx++) {
       const col = rx + rz * size;
@@ -188,7 +205,7 @@ function computeLight({ blocks, size, layer }, worldHeight) {
     }
   }
 
-  // 2c. Spread: each step into open air (or leaves) is one level dimmer.
+  // 2d. Spread: each step into open air (or leaves, or glass) is one level dimmer.
   while (head < tail) {
     const i = queue[head++];
     const next = light[i] - 1;
@@ -221,7 +238,7 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
 
   const ox = chunk.cx * chunkSize; // chunk's position in the world, in blocks
   const oz = chunk.cz * chunkSize;
-  const lists = { opaque: new FaceList(), cutout: new FaceList() };
+  const lists = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceList() };
 
   // Only loop up to the highest block in this chunk; everything above is air.
   let maxY = 0;
@@ -257,6 +274,9 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
           }
           const n = i + step[f];
           if (IS_OPAQUE[blocks[n]]) continue; // hidden behind a solid neighbour
+          // Two see-through blocks of the same kind side by side (e.g. a glass
+          // window): no wall between them, so the window looks like one pane.
+          if (blocks[n] === id && !IS_OPAQUE[id]) continue;
           // Tint the face by the light in the air just in front of it.
           list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], BRIGHTNESS[light[n]]);
         }
@@ -264,8 +284,8 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
     }
   }
 
-  // One mesh per render type that has faces. Today that's just "opaque",
-  // so each chunk is a single draw call.
+  // One mesh per render type that has faces. Most chunks only have "opaque"
+  // faces, so they're a single draw call; glass or lamps add one more each.
   const group = new THREE.Group();
   for (const [renderType, list] of Object.entries(lists)) {
     if (list.isEmpty()) continue;

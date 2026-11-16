@@ -244,6 +244,66 @@ function paintCore(t, rand) {
   }
 }
 
+function paintStoneBricks(t, rand) {
+  // Rows of bricks 4 pixels tall (3 brick + 1 mortar). Every other row is
+  // shifted half a brick, like a real wall.
+  for (let row = 0; row < 4; row++) {
+    const offset = row % 2 === 0 ? 0 : 4;
+    for (let r = 0; r < 4; r++) {
+      const y = row * 4 + r;
+      for (let x = 0; x < TILE; x++) {
+        const brickEdge = (x + offset) % 8 === 0;
+        let color;
+        if (r === 3 || brickEdge) color = C.stoneBricks.mortar;
+        else if (r === 0) color = C.stoneBricks.highlight;      // top of each brick catches the light
+        else color = pick(rand, C.stoneBricks.base);
+        t.set(x, y, color);
+      }
+    }
+  }
+  // A few chips and stains.
+  for (let i = 0; i < 6; i++) {
+    t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), C.stoneBricks.chip);
+  }
+}
+
+function paintGlowLamp(t, rand) {
+  // A dark frame with a warm glowing middle, split into 4 panes by a cross.
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) {
+      const edge = x === 0 || y === 0 || x === TILE - 1 || y === TILE - 1;
+      const innerEdge = x === 1 || y === 1 || x === TILE - 2 || y === TILE - 2;
+      const cross = x === 7 || x === 8 || y === 7 || y === 8;
+      let color;
+      if (edge) color = C.glowLamp.frame;
+      else if (innerEdge || cross) color = C.glowLamp.frameLight;
+      else {
+        // Brighter towards the middle of the lamp.
+        const d = Math.hypot(x - 7.5, y - 7.5);
+        color = d < 4.5 ? C.glowLamp.core : pick(rand, C.glowLamp.glow);
+      }
+      t.set(x, y, color);
+    }
+  }
+}
+
+function paintGlass(t) {
+  // A thin frame round the edge; the middle stays see-through (pixels never
+  // set are fully transparent). A few streaks of shine across the pane.
+  for (let i = 0; i < TILE; i++) {
+    t.set(i, 0, C.glass.frame);
+    t.set(i, TILE - 1, C.glass.frameShade);
+    t.set(0, i, C.glass.frame);
+    t.set(TILE - 1, i, C.glass.frameShade);
+  }
+  // Shine: two short diagonal lines in the upper-left.
+  for (let i = 0; i < 4; i++) {
+    t.set(3 + i, 6 - i, C.glass.shine);
+    t.set(3 + i, 9 - i, C.glass.shine);
+  }
+  t.set(11, 11, C.glass.shine); // a small glint bottom-right
+}
+
 // ---- Atlas layout ----
 // Order here = position in the atlas (left to right, then next row).
 // Names must match the `textures` entries in blocks.js.
@@ -258,6 +318,10 @@ const PAINTERS = {
   sand: paintSand,
   planks: paintPlanks,
   core: paintCore,
+  // New tiles go at the end, so the existing ones keep their look.
+  stone_bricks: paintStoneBricks,
+  glow_lamp: paintGlowLamp,
+  glass: paintGlass,
 };
 const TILE_NAMES = Object.keys(PAINTERS);
 
