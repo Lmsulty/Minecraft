@@ -23,15 +23,15 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// ---- Scene: background and air haze ----
+// ---- Scene: sky and distance haze ----
 // The actual colours are set by the day/night cycle (dayNight.js + theme.js).
 // The haze fades land out before the edge of the loaded chunks (about 80 blocks
 // away), so the world seems to go on forever. How it fades: curve.js.
 const scene = new THREE.Scene();
 scene.background = new THREE.Color();
-scene.fog = new THREE.Fog(0xffffff, THEME.station.hazeStart, THEME.station.hazeEnd);
+scene.fog = new THREE.Fog(0xffffff, THEME.haze.start, THEME.haze.end);
 
-// ---- Lights: soft sky light + a sun/moon, so each cube face gets a different shade ----
+// ---- Lights: soft sky light + the big sun (or starlight at night), so each cube face gets a different shade ----
 const ambientLight = new THREE.HemisphereLight();
 const mainLight = new THREE.DirectionalLight();
 scene.add(ambientLight, mainLight, mainLight.target); // target = the spot the light points at

@@ -1,67 +1,90 @@
 // ==========================================================
 //  THEME: every colour in the game lives in this file.
-//  To reskin the game (e.g. an alien world), edit only this file.
+//  To reskin the game, edit only this file.
 //
 //  Colours are written as '#rrggbb' (red, green, blue in hex).
 //  Interface colours may also use 'rgba(r, g, b, alpha)' for see-through.
 // ==========================================================
 
 export const THEME = {
-  // ---- Air haze and light through the day ----
+  // ---- Sky, haze and light through the day ----
   // The game clock runs 0:00 -> 24:00 (one full day takes about 6 real minutes).
-  // Each keyframe is a snapshot at a certain hour. The game blends
+  // Each keyframe is a snapshot of the sky at a certain hour. The game blends
   // smoothly between the keyframes on either side of the current time.
   //
-  //   haze:          colour of the air inside the station. Distant land fades
-  //                  into it, and it fills the background behind everything.
-  //   light:         colour of the main light (sun by day, moon by night, for now)
+  //   sky:           sky colour at the horizon. Distant land fades into it (the haze).
+  //   skyTop:        sky colour straight overhead (the sky fades between the two)
+  //   light:         colour of the big sun's light by day, or starlight by night
   //   lightStrength: how bright that light is
   //   ambientSky:    soft light coming from above
   //   ambientGround: soft light bouncing up from below (shades the undersides)
   //   ambientStrength: how bright the soft light is
   //   stars:         0 = no stars, 1 = fully visible stars
   skyKeyframes: [
-    { hour: 4,  name: 'night',   haze: '#10142a', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#141820', ambientStrength: 0.45, stars: 1 },
-    { hour: 5,  name: 'dawn',    haze: '#655a82', light: '#c49ac0', lightStrength: 0.5,  ambientSky: '#7a6a9a', ambientGround: '#2a2430', ambientStrength: 0.55, stars: 0.5 },
-    { hour: 6,  name: 'sunrise', haze: '#e8b48c', light: '#ffc58a', lightStrength: 1.0,  ambientSky: '#ffd9b0', ambientGround: '#5a4a40', ambientStrength: 0.85, stars: 0 },
-    { hour: 8,  name: 'day',     haze: '#a9c8d4', light: '#ffffff', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#666666', ambientStrength: 1.2,  stars: 0 },
-    { hour: 18, name: 'day',     haze: '#a9c8d4', light: '#ffffff', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#666666', ambientStrength: 1.2,  stars: 0 },
-    { hour: 19.5, name: 'sunset', haze: '#e09a6a', light: '#ff9a50', lightStrength: 1.0, ambientSky: '#ffbf8f', ambientGround: '#4f3f38', ambientStrength: 0.8,  stars: 0 },
-    { hour: 21, name: 'dusk',    haze: '#454066', light: '#9b8bc8', lightStrength: 0.45, ambientSky: '#5a5080', ambientGround: '#1e1a26', ambientStrength: 0.5,  stars: 0.6 },
-    { hour: 22, name: 'night',   haze: '#10142a', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#141820', ambientStrength: 0.45, stars: 1 },
+    { hour: 4,  name: 'night',   sky: '#121a30', skyTop: '#04060e', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#16161c', ambientStrength: 0.45, stars: 1 },
+    { hour: 5,  name: 'dawn',    sky: '#6e5a7e', skyTop: '#232448', light: '#c49ac0', lightStrength: 0.5,  ambientSky: '#7a6a9a', ambientGround: '#2a2428', ambientStrength: 0.55, stars: 0.5 },
+    { hour: 6,  name: 'sunrise', sky: '#f0b484', skyTop: '#6c8cb4', light: '#ffc58a', lightStrength: 1.0,  ambientSky: '#ffd9b0', ambientGround: '#5a4a3a', ambientStrength: 0.85, stars: 0 },
+    { hour: 8,  name: 'day',     sky: '#c3d6d6', skyTop: '#5f9cc6', light: '#fff8ea', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#6a6458', ambientStrength: 1.2,  stars: 0 },
+    { hour: 18, name: 'day',     sky: '#c3d6d6', skyTop: '#5f9cc6', light: '#fff8ea', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#6a6458', ambientStrength: 1.2,  stars: 0 },
+    { hour: 19.5, name: 'sunset', sky: '#ec9662', skyTop: '#4e5888', light: '#ff9a50', lightStrength: 1.0, ambientSky: '#ffbf8f', ambientGround: '#4f3f32', ambientStrength: 0.8,  stars: 0 },
+    { hour: 21, name: 'dusk',    sky: '#4c3f66', skyTop: '#16162e', light: '#9b8bc8', lightStrength: 0.45, ambientSky: '#5a5080', ambientGround: '#1e1a22', ambientStrength: 0.5,  stars: 0.6 },
+    { hour: 22, name: 'night',   sky: '#121a30', skyTop: '#04060e', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#16161c', ambientStrength: 0.45, stars: 1 },
   ],
 
-  // ---- Things in the sky ----
-  sun: {
-    core: '#fff6c8',  // middle of the disc
-    rim: '#ffd25a',   // outer ring of the disc
-    glow: '#ffe08a',  // soft halo around it
+  // Distance haze: how far-away land fades into the horizon sky colour.
+  // Distances are in blocks, straight from your eye. The loaded world ends
+  // about 80 blocks away, so `end` must stay at or below ~78 to hide the edge.
+  haze: {
+    start: 45,   // fully clear up to here
+    end: 78,     // fully hazed from here
+    curve: 1,    // 1 = fades evenly. Bigger = stays clear longer, then fades quickly.
   },
-  moon: {
-    core: '#e8ecf4',
-    crater: '#b8c0d0',
-    glow: '#a8b8e0',
+
+  // ---- Things in the sky (drawn in sky.js) ----
+  // The two suns rise and set together. The first one is the big one that
+  // lights the world; the second trails a little behind on a slightly
+  // different path, so it sets a moment later.
+  suns: [
+    {
+      size: 40,                // how big it looks (the old sun was 40)
+      core: '#fff4d6',         // middle of the disc
+      rim: '#ffd27a',          // outer ring of the disc
+      glow: '#ffe2a0',         // soft halo around it
+      lag: 0,                  // how far behind the big sun it travels (0 = it IS the big sun)
+      tilt: 0,                 // pushes its path a little north (+) or south (-)
+    },
+    {
+      size: 20,
+      core: '#f2f8ff',
+      rim: '#a9cfff',
+      glow: '#bcd8ff',
+      lag: 0.16,               // about 9 degrees behind
+      tilt: 0.12,
+    },
+  ],
+  // A small black hole, high in the northern sky. Every planet orbits it.
+  // It's visible day and night; at night the stars slowly wheel around it.
+  blackHole: {
+    size: 34,                  // how big it looks
+    height: 40,                // degrees above the horizon
+    shadow: '#000000',         // the black middle
+    ringInner: '#fff2d8',      // hottest part of the glowing ring
+    ringOuter: '#ffae62',      // cooler outer edge of the ring
+    glow: '#ff9a4a',           // faint halo around it all
   },
   stars: '#ffffff',
 
-  // ---- Space station: the world is drawn as the inside of a cylinder (curve.js) ----
+  // ---- Easter egg: curved world (press B in game, see curve.js) ----
+  // Draws the world as if you're inside a giant spinning cylinder.
   // Only the drawing bends; walking, building and saving stay flat.
-  station: {
-    curveRadius: 96,     // blocks from the ground to the middle of the cylinder.
-                          // Smaller = stronger curve (96 is dramatic, 192 is subtle).
-                          // Must stay bigger than the build height above ground.
-    curveGroundLevel: 48, // the height that bends at exactly that radius
+  curve: {
+    startsOn: false,      // true = curved when the game starts (B still toggles it)
+    // The ground near you stays flat, then curves up more and more with distance.
+    flatZone: 0,          // blocks around you that stay completely flat
+    curveRamp: 0,         // blocks over which the curve grows from nothing to full strength
+    curveRadius: 75,      // how tight the full-strength curve is (smaller = more dramatic)
+    curveGroundLevel: 48, // the height that sits exactly on the curved ground line
                           // (average ground level, see BASE_HEIGHT in terrain.js)
-
-    // Air haze: how distant land fades into the haze colour (keyframes above).
-    // Distances are in blocks, measured straight from your eye to the block.
-    hazeStart: 28,        // fully clear up to here
-    hazeEnd: 78,          // fully hazed from here. Must stay at or below ~78,
-                          // or you'd see the edge of the loaded world.
-    hazeCurve: 3,         // 1 = fades evenly. Bigger = stays clear longer, then
-                          // fades quickly near the end (so the rising land shows).
-    hazeMax: 1,           // how hazy the farthest land gets (1 = disappears).
-                          // Lowered later, once the far side of the cylinder is drawn.
   },
 
   // ---- In the world ----
@@ -70,110 +93,120 @@ export const THEME = {
   // How dark caves get where no sunlight reaches. Blocks are tinted from this
   // colour (no light at all) up to full brightness (open sky). An alien theme
   // could make this a faint glow, e.g. '#183020'.
-  caveLight: '#2c2c38',
+  caveLight: '#2e2a30',
+
+  // Ambient occlusion: corners and edges where blocks meet get slightly
+  // darker, like real soft shadows. 0 = off, 0.5 = strong.
+  ambientOcclusion: 0.35,
 
   // ---- Trees: shape and placement (logic in trees.js) ----
   // Colours come from the trunk/leaf blocks' textures below. For alien trees,
   // change the numbers here, or point trunkBlock/leafBlock at other blocks.
   trees: {
-    chance: 0.35,          // how many possible spots get a tree (0 = none, 1 = as many as fit)
+    chance: 0.45,          // how many possible spots get a tree (0 = none, 1 = as many as fit)
     spacing: 3,            // extra room between trees (bigger = more spread out)
     trunkBlock: 'wood',    // block names from blocks.js
     leafBlock: 'leaves',
-    trunkHeight: [4, 6],   // random between these (inclusive)
+    trunkHeight: [7, 9],   // random between these (inclusive)
     // Leaf layers, measured from the top block of the trunk (y: 0).
-    // radius 2 = 5 x 5 square, radius 1 = 3 x 3, radius 0 = a single block.
+    // radius 3 = 7 blocks across, 2 = 5, 1 = 3, 0 = a single block.
+    // Gaps between the y values leave bare trunk showing: a tiered "pagoda" tree.
     canopy: [
-      { y: -1, radius: 2 },
-      { y: 0, radius: 2 },
-      { y: 1, radius: 1 },
-      { y: 2, radius: 0 },
+      { y: -4, radius: 3 },  // wide bottom tier
+      { y: -2, radius: 2 },  // middle tier
+      { y: 0, radius: 1 },   // small top tier
+      { y: 1, radius: 0 },   // tip
     ],
-    trimCorners: true,     // remove each layer's 4 corners for a rounder shape
+    roundLayers: true,     // true = round tiers, false = square
   },
 
   // ---- Block textures (see textures.js for the patterns) ----
   // Lists like base: [...] are picked from at random, pixel by pixel.
   // Keep each list the same length if you want the same pattern with new colours.
   textures: {
-    dirt: {
-      base: ['#79553a', '#866042', '#6e4c34', '#805a3e'],
-      pebbleDark: '#5a3e2c',
-      pebbleLight: '#9e7c5c',
+    dirt: {                // reddish clay soil in horizontal layers
+      base: ['#8f4e36', '#9a5840', '#844630', '#94533a'],
+      band: '#6e3a28',     // darker layer lines
+      bandLight: '#a8664a',// thin lighter line just above each layer
+      pebble: '#c08a68',
+      pebbleDark: '#5e3022',
     },
-    grassTop: {
-      base: ['#56963c', '#5c9e40', '#508e38', '#62a644'],
-      bladeTip: '#80c056',
-      bladeShadow: '#42782e',
+    grassTop: {            // golden meadow, seen from above
+      base: ['#a3ad4c', '#98a344', '#acb656', '#9aa648'],
+      tuft: '#c2ca66',     // lit tip of each little tuft
+      tuftShadow: '#7f8a36',
+      flower: ['#e8c95a', '#f2e6b0'],
     },
-    grassSide: {           // the dirt part uses the dirt colours above
-      bandTop: '#68ae48',  // very top row of the grass band
-      band: ['#56963c', '#508e38'],
-      bandEdge: '#3e702c', // where grass meets dirt
-      tuft: '#467a30',
+    grassSide: {           // the whole side is a thick mat of moss and roots (no soil showing)
+      edge: '#acb656',     // top row, where the meadow top meets the side
+      base: ['#7c8a3a', '#71802f', '#86943f'],
+      streak: '#5f6c28',   // darker vertical fibres
+      root: '#5e5a2c',     // tangled roots near the bottom
     },
-    stone: {
-      base: ['#7d7d83', '#84848a', '#77777d', '#8a8a90'],
-      crack: '#5c5c62',
-      crackEdge: '#96969c',
-      fleck: '#98989e',
+    stone: {               // warm layered rock
+      base: ['#9b8d7b', '#a59784', '#8f8170', '#a09280'],
+      layer: '#85776a',    // bedding lines running across
+      layerLight: '#b3a592',
+      crack: '#6f6356',
+      fleck: '#b8ab98',
     },
-    woodSide: {            // bark
-      base: ['#684a30', '#62462d', '#6e4f33'],
-      groove: '#463120',
-      ridge: '#78583a',
+    woodSide: {            // red-brown bark with rings around the trunk
+      base: ['#7a3e2a', '#743a27', '#80442e'],
+      ring: '#5e2e20',
+      ringLight: '#94543a',
+      knot: '#4a2418',
     },
     woodTop: {             // cut log end
-      bark: ['#563c27', '#4a3422'],
-      ringLight: '#ba9462',
-      ringDark: '#a27c4f',
-      heart: '#8a6640',
+      bark: ['#5e2e20', '#6a3424'],
+      ringLight: '#c48a5e',
+      ringDark: '#a8704a',
+      heart: '#8a5236',
     },
-    leaves: {
-      shadow: ['#1e441c', '#244e20'],
-      clump: ['#36722a', '#3c7a2e'],
-      lit: '#4e9238',
+    leaves: {              // deep teal-green needle clusters
+      shadow: ['#1f4a37', '#23513c'],
+      needle: ['#2f6b4f', '#3a7a5a'],
+      lit: '#4a8c68',      // needle tips catching the light
     },
     sand: {
-      base: ['#decc94', '#d8c68e', '#e3d29c'],
-      ripple: '#ccba82',
-      speckDark: '#baa672',
-      speckLight: '#f0e4b8',
+      base: ['#e8dcb8', '#dfd2ac', '#ece2c2'],
+      ripple: '#d2c49e',
+      speckDark: '#c2b28a',
+      speckLight: '#f6eed6',
     },
     planks: {
-      board: '#b08250',    // each board is this, made slightly lighter or darker
-      seam: '#624428',     // dark line between boards
-      joint: '#704f2f',    // where two boards meet end to end
+      board: '#a8643f',    // each board is this, made slightly lighter or darker
+      seam: '#5a2e1c',     // dark line between boards
+      joint: '#6e3a24',    // where two boards meet end to end
     },
     core: {                // unbreakable rock at the bottom of the world
-      base: ['#2e2c33', '#34313a', '#29272d', '#38353f'],
-      vein: '#4d4856',     // pale streaks running across it
-      speck: '#1c1a20',
+      base: ['#2e2a2a', '#34302f', '#292626', '#383332'],
+      vein: '#4d4542',     // pale streaks running across it
+      speck: '#1c1a19',
     },
     // ---- Crafted-only blocks ----
     stoneBricks: {
-      base: ['#8a8a92', '#84848c', '#90909a'],
-      highlight: '#a2a2aa', // top row of each brick
-      mortar: '#55555c',    // lines between bricks
-      chip: '#6c6c74',
+      base: ['#a69884', '#9f917d', '#ad9f8a'],
+      highlight: '#bcae98', // top row of each brick
+      mortar: '#6a5e52',    // lines between bricks
+      chip: '#8a7d6c',
     },
     glowLamp: {
-      frame: '#3a2a1c',     // outer edge
-      frameLight: '#5e4430',// inner edge and the cross between panes
+      frame: '#4a2a1c',     // outer edge
+      frameLight: '#7a4a30',// inner edge and the cross between panes
       glow: ['#ffcc5a', '#ffd46e', '#f7c050'],
       core: '#fff1b8',      // brightest middle
     },
     glass: {
-      frame: '#d8eef4',     // top and left edges
-      frameShade: '#9cc0cc',// bottom and right edges
-      shine: '#f4fcff',     // streaks of reflection (the rest of the pane is see-through)
+      frame: '#eae4d4',     // top and left edges
+      frameShade: '#bcb39c',// bottom and right edges
+      shine: '#fffaf0',     // streaks of reflection (the rest of the pane is see-through)
     },
   },
 
   // ---- Interface (pause screen, FPS box, hotbar...) ----
   // These become CSS variables (e.g. var(--panel-bg)) when the game starts.
   ui: {
-    '--page-bg': '#87ceeb',                      // behind everything while the game loads
+    '--page-bg': '#9fc0d0',                      // behind everything while the game loads
     '--text': '#ffffff',
     '--overlay-bg': 'rgba(0, 0, 0, 0.5)',        // dims the screen when paused
     '--panel-bg': 'rgba(0, 0, 0, 0.5)',          // FPS box and "Saved" message

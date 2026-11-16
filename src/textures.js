@@ -61,85 +61,123 @@ class Tile {
 // Each gets an empty tile and its own seeded random function.
 
 function paintDirt(t, rand) {
+  // Reddish clay in horizontal layers, like soil seen in a cut bank.
   for (let y = 0; y < TILE; y++) {
     for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.dirt.base));
   }
-  // Small pebbles: a few 1-3 pixel clusters, some dark, some light.
-  for (let i = 0; i < 6; i++) {
+  // Two gently wavy layer lines, each with a thin lighter line on top.
+  for (const home of [4, 11]) {
+    let y = home;
+    for (let x = 0; x < TILE; x++) {
+      if (rand() < 0.25) y += rand() < 0.5 ? -1 : 1;
+      y = Math.max(home - 1, Math.min(home + 1, y));
+      t.set(x, y, C.dirt.band);
+      if (rand() < 0.7) t.set(x, y - 1, C.dirt.bandLight);
+    }
+  }
+  // A few small pebbles: a light pixel with a dark one underneath.
+  for (let i = 0; i < 5; i++) {
     const x = Math.floor(rand() * TILE);
     const y = Math.floor(rand() * TILE);
-    const color = rand() < 0.6 ? C.dirt.pebbleDark : C.dirt.pebbleLight;
-    t.set(x, y, color);
-    if (rand() < 0.6) t.set(x + 1, y, color);
-    if (rand() < 0.4) t.set(x, y + 1, shade(color, 0.9));
+    t.set(x, y, C.dirt.pebble);
+    t.set(x, y + 1, C.dirt.pebbleDark);
+    if (rand() < 0.5) t.set(x + 1, y, C.dirt.pebble);
   }
 }
 
 function paintGrassTop(t, rand) {
+  // Golden meadow seen from above: neat rows of little tufts, each a short
+  // diagonal stroke with a lit tip and a shadow beside it, plus a few flowers.
   for (let y = 0; y < TILE; y++) {
     for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.grassTop.base));
   }
-  // Light blade tips with a darker pixel beneath each, like little leaning blades.
-  for (let i = 0; i < 14; i++) {
-    const x = Math.floor(rand() * TILE);
-    const y = Math.floor(rand() * TILE);
-    t.set(x, y, C.grassTop.bladeTip);
-    t.set(x + 1, y + 1, C.grassTop.bladeShadow);
+  // Tufts sit on a staggered grid (every 4 pixels, every other row shifted),
+  // nudged a little so it doesn't look too regular.
+  for (let gy = 0; gy < TILE; gy += 4) {
+    for (let gx = 0; gx < TILE; gx += 4) {
+      const x = gx + ((gy / 4) % 2) * 2 + Math.floor(rand() * 2);
+      const y = gy + Math.floor(rand() * 2);
+      t.set(x, y + 2, C.grassTop.tuftShadow);    // base of the stroke
+      t.set(x + 1, y + 1, pick(rand, C.grassTop.base));
+      t.set(x + 2, y, C.grassTop.tuft);          // lit tip, leaning up-right
+      t.set(x + 1, y + 2, C.grassTop.tuftShadow); // shadow beside it
+    }
+  }
+  // A few flowers.
+  for (let i = 0; i < 3; i++) {
+    t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), pick(rand, C.grassTop.flower));
   }
 }
 
 function paintGrassSide(t, rand) {
-  paintDirt(t, rand);
-  // An uneven grass band along the top. Its depth wanders column by column.
-  let depth = 3;
-  for (let x = 0; x < TILE; x++) {
-    depth += Math.floor(rand() * 3) - 1; // -1, 0 or +1
-    depth = Math.max(2, Math.min(5, depth));
-    for (let y = 0; y < depth; y++) {
-      t.set(x, y, y === 0 ? C.grassSide.bandTop : pick(rand, C.grassSide.band));
-    }
-    t.set(x, depth, C.grassSide.bandEdge); // darker edge where grass meets dirt
-    // Occasional tuft hanging a little further down.
-    if (rand() < 0.2) t.set(x, depth + 1, C.grassSide.tuft);
+  // The whole side is a thick mat of moss and roots: no soil showing.
+  // Darker fibres run up and down; roots tangle near the bottom.
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.grassSide.base));
   }
+  // Vertical fibres of random length.
+  for (let i = 0; i < 10; i++) {
+    const x = Math.floor(rand() * TILE);
+    const y0 = 1 + Math.floor(rand() * 10);
+    const length = 2 + Math.floor(rand() * 4);
+    for (let y = y0; y < y0 + length && y < TILE; y++) t.set(x, y, C.grassSide.streak);
+  }
+  // Roots: the bottom 3 rows are speckled with root colour, thicker at the very bottom.
+  for (let y = TILE - 3; y < TILE; y++) {
+    const chance = (y - (TILE - 4)) * 0.22;
+    for (let x = 0; x < TILE; x++) if (rand() < chance) t.set(x, y, C.grassSide.root);
+  }
+  // Top row: the meadow colour, so the edge between top and side reads cleanly.
+  for (let x = 0; x < TILE; x++) t.set(x, 0, C.grassSide.edge);
 }
 
 function paintStone(t, rand) {
+  // Warm rock in horizontal bedding layers, with a crack or two between them.
   for (let y = 0; y < TILE; y++) {
     for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.stone.base));
   }
-  // Two thin cracks that wander downwards, with a lighter edge beside them.
-  for (let c = 0; c < 2; c++) {
-    let x = Math.floor(rand() * TILE);
-    let y = Math.floor(rand() * TILE);
-    const length = 6 + Math.floor(rand() * 4);
-    for (let i = 0; i < length; i++) {
-      t.set(x, y, C.stone.crack);
-      t.set(x + 1, y, C.stone.crackEdge);
-      x += Math.floor(rand() * 3) - 1;
-      y += 1;
+  // Layer lines at slightly uneven heights, each with a lit edge above it.
+  const layers = [2 + Math.floor(rand() * 2), 7 + Math.floor(rand() * 2), 12 + Math.floor(rand() * 2)];
+  for (const home of layers) {
+    let y = home;
+    for (let x = 0; x < TILE; x++) {
+      if (rand() < 0.12) y += rand() < 0.5 ? -1 : 1;
+      y = Math.max(home - 1, Math.min(home + 1, y));
+      t.set(x, y, C.stone.layer);
+      t.set(x, y - 1, C.stone.layerLight);
     }
   }
-  // A couple of lighter flecks.
-  for (let i = 0; i < 5; i++) {
+  // Short vertical cracks, so the layers look like separate slabs.
+  for (let c = 0; c < 3; c++) {
+    const x = Math.floor(rand() * TILE);
+    const y = Math.floor(rand() * TILE);
+    for (let i = 0; i < 3; i++) t.set(x, y + i, C.stone.crack);
+  }
+  for (let i = 0; i < 6; i++) {
     t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), C.stone.fleck);
   }
 }
 
 function paintWoodSide(t, rand) {
-  // Bark: brown base with 4 dark grooves running up and down, wiggling a little.
+  // Red-brown bark with rings around the trunk every few pixels,
+  // each with a lit line above it, and the odd knot.
   for (let y = 0; y < TILE; y++) {
     for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.woodSide.base));
   }
-  for (let g = 0; g < 4; g++) {
-    const home = g * 4 + 1;
-    let x = home;
-    for (let y = 0; y < TILE; y++) {
-      if (rand() < 0.3) x += rand() < 0.5 ? -1 : 1;
-      x = Math.max(home - 1, Math.min(home + 1, x));
-      t.set(x, y, C.woodSide.groove);
-      t.set(x + 1, y, C.woodSide.ridge); // lit ridge next to the groove
+  for (let ring = 0; ring < 4; ring++) {
+    const y = ring * 4 + 3;
+    for (let x = 0; x < TILE; x++) {
+      // Rings are mostly straight, with an occasional one-pixel step.
+      const dip = rand() < 0.15 ? 1 : 0;
+      t.set(x, y + dip, C.woodSide.ring);
+      t.set(x, y - 1 + dip, C.woodSide.ringLight);
     }
+  }
+  for (let k = 0; k < 2; k++) {
+    const x = Math.floor(rand() * TILE);
+    const y = Math.floor(rand() * TILE);
+    t.set(x, y, C.woodSide.knot);
+    t.set(x + 1, y, C.woodSide.knot);
   }
 }
 
@@ -162,23 +200,21 @@ function paintWoodTop(t, rand) {
 }
 
 function paintLeaves(t, rand) {
-  // Start with deep shadow, then paint round clumps of leaves on top.
+  // Deep shadow, covered in little fans of needles: three short strokes
+  // spreading up-left, up and up-right from one point, with lit tips.
   for (let y = 0; y < TILE; y++) {
     for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.leaves.shadow));
   }
-  for (let i = 0; i < 16; i++) {
-    const cx = rand() * TILE;
-    const cy = rand() * TILE;
-    const radius = 1.5 + rand() * 1.2;
-    for (let y = Math.floor(cy - radius); y <= cy + radius; y++) {
-      for (let x = Math.floor(cx - radius); x <= cx + radius; x++) {
-        const d = Math.hypot(x - cx, y - cy);
-        if (d > radius) continue;
-        // Lighter on the upper-left of each clump, like light from above.
-        const lit = x - cx + (y - cy) < -1;
-        t.set(x, y, lit ? C.leaves.lit : pick(rand, C.leaves.clump));
-      }
+  for (let i = 0; i < 14; i++) {
+    const x = Math.floor(rand() * TILE);
+    const y = Math.floor(rand() * TILE);
+    const needle = pick(rand, C.leaves.needle);
+    for (const dx of [-1, 0, 1]) {
+      t.set(x + dx, y - 1, needle);
+      t.set(x + dx * 2, y - 2, needle);
+      t.set(x + dx * 2, y - 3, C.leaves.lit); // tip catches the light
     }
+    t.set(x, y, needle); // where the needles join
   }
 }
 

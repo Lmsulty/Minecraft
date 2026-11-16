@@ -64,6 +64,8 @@ export function treeBlockAt(tree, x, y, z) {
   const dx = Math.abs(x - tree.x);
   const dz = Math.abs(z - tree.z);
   if (dx > radius || dz > radius) return BLOCK.AIR;
-  if (S.trimCorners && radius > 0 && dx === radius && dz === radius) return BLOCK.AIR;
+  // Round tiers: keep only the blocks inside a circle. (The "+ radius" makes
+  // the circle a little fuller, so small tiers don't come out as a plus sign.)
+  if (S.roundLayers && dx * dx + dz * dz > radius * radius + radius) return BLOCK.AIR;
   return LEAVES;
 }

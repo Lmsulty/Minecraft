@@ -76,6 +76,35 @@ const FACE_UVS = BLOCK_TYPES.map((type) =>
   type.textures ? FACES.map((face) => getTileUV(type.textures[face.tile])) : null
 );
 
+// ---- Ambient occlusion: soft shadows where blocks meet ----
+// Each corner of a face looks at the 3 blocks just in front of it that touch
+// that corner: one on each side, and one diagonally. The more of them are
+// solid, the darker that corner. The graphics card then fades smoothly
+// between the 4 corners, so edges and inside corners get soft shading.
+//
+// Level 3 = nothing nearby (full brightness) ... level 0 = tucked in a corner.
+const AO_ON = THEME.ambientOcclusion > 0;
+const AO_BRIGHTNESS = [0, 1, 2, 3].map((level) => 1 - (THEME.ambientOcclusion * (3 - level)) / 3);
+const NO_SHADE = [3, 3, 3, 3];
+
+// For each face and each of its 4 corners: the 3 blocks (as [dx, dy, dz]
+// from the block) that can shade that corner.
+const AO_NEIGHBOURS = FACES.map((face) => {
+  const out = face.dir;                                   // the face points this way
+  const axis = out.findIndex((v) => v !== 0);
+  const [a1, a2] = [0, 1, 2].filter((a) => a !== axis);   // the two directions along the face
+  return face.corners.map((corner) => {
+    const side1 = [...out];
+    side1[a1] += corner[a1] === 1 ? 1 : -1;
+    const side2 = [...out];
+    side2[a2] += corner[a2] === 1 ? 1 : -1;
+    const diagonal = [...out];
+    diagonal[a1] = side1[a1];
+    diagonal[a2] = side2[a2];
+    return [side1, side2, diagonal];
+  });
+});
+
 // Collects faces for one render type, then turns them into a Three.js shape.
 class FaceList {
   constructor() {
@@ -86,17 +115,26 @@ class FaceList {
     this.indices = [];
   }
 
-  addFace(x, y, z, face, uv, [r, g, b]) {
+  // [r, g, b] = the light tint. ao = shade level (0-3) for each of the 4 corners.
+  addFace(x, y, z, face, uv, [r, g, b], ao = NO_SHADE) {
     const first = this.positions.length / 3; // index of this face's first corner
-    for (const [cx, cy, cz] of face.corners) {
+    for (let k = 0; k < 4; k++) {
+      const [cx, cy, cz] = face.corners[k];
+      const shade = AO_BRIGHTNESS[ao[k]];
       this.positions.push(x + cx, y + cy, z + cz);
       this.normals.push(face.dir[0], face.dir[1], face.dir[2]);
-      this.colors.push(r, g, b);
+      this.colors.push(r * shade, g * shade, b * shade);
     }
     // Corners are bottom-left, bottom-right, top-left, top-right.
     this.uvs.push(uv.u0, uv.v0, uv.u1, uv.v0, uv.u0, uv.v1, uv.u1, uv.v1);
-    // Two triangles make the square.
-    this.indices.push(first, first + 1, first + 2, first + 2, first + 1, first + 3);
+    // Two triangles make the square. The square can be split along either
+    // diagonal; splitting along the one joining the two darker corners keeps
+    // the soft shadows smooth and even (the other way leaves a visible crease).
+    if (ao[0] + ao[3] < ao[1] + ao[2]) {
+      this.indices.push(first, first + 1, first + 3, first, first + 3, first + 2);
+    } else {
+      this.indices.push(first, first + 1, first + 2, first + 2, first + 1, first + 3);
+    }
   }
 
   isEmpty() {
@@ -255,6 +293,17 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
 
   // How far apart neighbouring blocks are in the region array, per face direction.
   const step = FACES.map(({ dir: [dx, dy, dz] }) => dx + dz * size + dy * layer);
+  // The same for the ambient occlusion neighbours, plus their height change
+  // (so we never look below the bottom or above the top of the world).
+  // Stored flat for speed: per face, 4 corners x 3 blocks, in that order.
+  const aoStep = AO_NEIGHBOURS.map((corners) => corners.flat().map(([dx, dy, dz]) => dx + dz * size + dy * layer));
+  const aoDy = AO_NEIGHBOURS.map((corners) => corners.flat().map(([, dy]) => dy));
+  const ao = [3, 3, 3, 3];
+  // 1 if the block (step away from block i, at height y + dy) is solid, else 0.
+  const solidAt = (i, y, step, dy) => {
+    const ny = y + dy;
+    return ny >= 0 && ny < worldHeight ? IS_OPAQUE[blocks[i + step]] : 0;
+  };
 
   for (let y = 0; y <= maxY; y++) {
     for (let lz = 0; lz < chunkSize; lz++) {
@@ -280,7 +329,22 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
           // window): no wall between them, so the window looks like one pane.
           if (blocks[n] === id && !IS_OPAQUE[id]) continue;
           // Tint the face by the light in the air just in front of it.
-          list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], BRIGHTNESS[light[n]]);
+          const tint = BRIGHTNESS[light[n]];
+          // Glowing blocks are never shaded; everything else gets soft corner shadows.
+          if (!AO_ON || list === lists.glow) {
+            list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint);
+            continue;
+          }
+          const steps = aoStep[f];
+          const dys = aoDy[f];
+          for (let k = 0; k < 4; k++) {
+            const j = k * 3; // this corner's 3 blocks: side, side, diagonal
+            const a = solidAt(i, y, steps[j], dys[j]);
+            const b = solidAt(i, y, steps[j + 1], dys[j + 1]);
+            // Both sides solid = deepest corner, even if the diagonal is open.
+            ao[k] = a && b ? 0 : 3 - a - b - solidAt(i, y, steps[j + 2], dys[j + 2]);
+          }
+          list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint, ao);
         }
       }
     }
