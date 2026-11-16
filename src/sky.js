@@ -3,8 +3,8 @@ import { THEME, hexToRgb } from './theme.js';
 
 // Everything drawn in the sky, made in code:
 //  - the sky dome: colour fading from the horizon to overhead, a glow around
-//    the big sun, the stars and galaxy band, and the black hole (with its
-//    swirling gas, and the stars and sky bent around it)
+//    the big sun, the stars and galaxy band, and the black hole (a fiery
+//    whirlpool being sucked into a hole, with the stars bent around it)
 //  - the two suns (small pixel-art pictures)
 // dayNight.js moves things and sets their colours through the day.
 
@@ -25,9 +25,9 @@ const STAR_RADIUS = 0.0019;  // how big a faint star is (an angle; about 1-2 pix
 // ---- Black hole shape (sizes are in "centre radii": 1 = edge of the black centre) ----
 const BH = THEME.blackHole;
 const LENS_REACH = 16;       // the bending of light fades out by this distance
-const DISC_INNER = 1.6;      // where the gas disc starts (gas vanishes inside this)
-const DISC_OUTER = 5;        // where it ends
-const DISC_FLATNESS = 0.16;  // how edge-on we see the disc (smaller = flatter)
+const SWIRL = BH.swirlSize;  // outer edge of the whirlpool
+// Seen from above at an angle, the round whirlpool looks squashed top to bottom.
+const SQUASH = Math.sin(THREE.MathUtils.degToRad(BH.viewAngle));
 
 const holeView = BH.perPlanet[THEME.planet];
 if (!holeView) throw new Error(`theme.js: no blackHole.perPlanet entry for planet "${THEME.planet}"`);
@@ -58,10 +58,12 @@ export function makeSkyDome() {
       holeSize: { value: THREE.MathUtils.degToRad(holeView.size) },
       holeBrightness: { value: holeView.brightness },
       holeShadow: { value: new THREE.Color(BH.shadow) },
-      ringInner: { value: new THREE.Color(BH.ringInner) },
-      ringOuter: { value: new THREE.Color(BH.ringOuter) },
+      gasOuter: { value: new THREE.Color(BH.gasOuter) },
+      gasMiddle: { value: new THREE.Color(BH.gasMiddle) },
+      gasInner: { value: new THREE.Color(BH.gasInner) },
       holeGlow: { value: new THREE.Color(BH.glow) },
-      discTilt: { value: THREE.MathUtils.degToRad(BH.discTilt) },
+      dayDarkColor: { value: new THREE.Color(BH.dayDarkColor) },
+      swirlTilt: { value: THREE.MathUtils.degToRad(BH.tilt) },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDirection;
@@ -88,10 +90,12 @@ export function makeSkyDome() {
       uniform float holeSize;
       uniform float holeBrightness;
       uniform vec3 holeShadow;
-      uniform vec3 ringInner;
-      uniform vec3 ringOuter;
+      uniform vec3 gasOuter;
+      uniform vec3 gasMiddle;
+      uniform vec3 gasInner;
       uniform vec3 holeGlow;
-      uniform float discTilt;
+      uniform vec3 dayDarkColor;
+      uniform float swirlTilt;
       varying vec3 vDirection;
 
       // ---- Random numbers and smooth noise (same input, same output) ----
@@ -134,27 +138,40 @@ export function makeSkyDome() {
         return v * cos(angle) + cross(axis, v) * sin(angle) + axis * dot(axis, v) * (1.0 - cos(angle));
       }
 
-      // ---- Gas in the disc ----
-      // How bright the gas is at distance rho from the centre and angle phi
-      // around the disc. Streaks are twisted into a spiral; the whole pattern
-      // turns (swirl) and slides inwards (inflow) over time.
-      float gas(float rho, float phi) {
+      // ---- The whirlpool of gas ----
+      // How much gas there is at distance rho from the centre (in hole radii,
+      // measured flat across the whirlpool) and angle phi around it.
+      // Thick spiral arms, roughed up by churning noise. The whole pattern
+      // turns; because the arms are wound this way round, turning makes them
+      // look like they're pouring inwards. The churning also slides inwards.
+      float whirlpool(float rho, float phi) {
         float logR = log(rho);
-        float a = phi + 4.0 * logR - time * ${f(BH.swirlSpeed)};
-        vec3 p = vec3(cos(a) * 4.5, sin(a) * 4.5, logR * 4.0 + time * ${f(BH.inflowSpeed)} * 4.0);
-        float n = noise(p) * 0.6 + noise(p * vec3(2.3, 2.3, 1.7) + 5.0) * 0.4;
-        float clumps = smoothstep(0.45, 0.9, n);
-        // Brighter towards the middle, gone right at the inner edge (swallowed),
-        // fading out at the outer edge.
-        float profile = pow(${f(DISC_INNER)} / rho, 1.3)
-                      * smoothstep(${f(DISC_INNER)}, ${f(DISC_INNER + 0.25)}, rho)
-                      * (1.0 - smoothstep(${f(DISC_OUTER - 2.0)}, ${f(DISC_OUTER)}, rho));
-        return profile * (0.6 + 1.1 * clumps);
+        float spin = phi - ${f(BH.armTwist)} * 2.0 * logR - time * ${f(BH.swirlSpeed)};
+        vec3 p = vec3(cos(spin) * 2.0, sin(spin) * 2.0, logR * 3.0 + time * ${f(BH.inflowSpeed)} * 3.0);
+        float churn = noise(p) * 0.6 + noise(p * 2.7 + 7.0) * 0.4;
+        float arms = 0.5 + 0.5 * cos(${f(BH.armCount)} * spin + (churn - 0.5) * 7.0 * ${f(BH.turbulence)});
+        arms = pow(arms, 1.5);
+        float gas = (0.3 + 0.7 * arms) * mix(1.0, 0.4 + 1.2 * churn, ${f(BH.turbulence)});
+        // Denser and brighter towards the middle; it pours over the edge of
+        // the hole and vanishes, and thins out at the outside.
+        float profile = pow(1.3 / rho, 0.9)
+                      * smoothstep(0.82, 1.15, rho)
+                      * (1.0 - smoothstep(${f(SWIRL * 0.6)}, ${f(SWIRL)}, rho));
+        return gas * profile;
       }
 
-      // Colour of glowing gas: white-hot when bright, orange when dimmer.
-      vec3 gasColor(float light) {
-        return mix(ringOuter, ringInner, clamp(light * 0.8, 0.0, 1.0)) * light;
+      // Colour of the gas at distance rho: white-hot where it falls in,
+      // orange in the middle, dark red at the outside.
+      vec3 gasColor(float rho) {
+        float outward = clamp((rho - 1.0) / ${f(SWIRL - 1)}, 0.0, 1.0);
+        vec3 color = mix(gasInner, gasMiddle, smoothstep(0.0, 0.3, outward));
+        return mix(color, gasOuter, smoothstep(0.3, 0.85, outward));
+      }
+
+      // Lay glowing gas over the colour behind it.
+      vec3 addGas(vec3 behind, float rho, float amount, float power) {
+        float cover = clamp(amount * 1.6, 0.0, 0.97);
+        return behind * (1.0 - cover) + gasColor(rho) * amount * power * 1.3;
       }
 
       void main() {
@@ -211,69 +228,45 @@ export function makeSkyDome() {
           // Brighter at night.
           float power = holeBrightness * (1.0 + ${f(BH.nightBoost)} * starsVisible);
 
-          // Faint, sparkly ring of bent starlight, where light from stars
-          // right behind it ends up.
-          float einstein = sqrt(${f(BH.bendStrength)});
-          float around = atan(q.y, q.x);
-          float beads = smoothstep(0.55, 0.85, noise(vec3(cos(around) * 9.0, sin(around) * 9.0, 0.0)));
-          color += starColor * (0.05 + 0.45 * beads) * exp(-pow((r - einstein) / 0.06, 2.0)) * starsVisible;
+          // By day, the sky around it darkens, as if it's swallowing the daylight.
+          float dusk = exp(-pow(r / ${f(SWIRL * 1.25)}, 2.0)) * ${f(BH.dayDarkening)} * (1.0 - starsVisible);
+          color = mix(color, dayDarkColor, dusk);
 
           // Soft glow spreading into the sky (fades to nothing before the edge of this area).
           float glow = (0.40 * exp(-(r - 1.0) / 1.8) + 0.10 * exp(-r / 4.0))
                      * (1.0 - smoothstep(${f(LENS_REACH * 0.6)}, ${f(LENS_REACH + 3.0)}, r));
           color += holeGlow * glow * power * mix(0.6, 1.0, starsVisible);
 
-          // Positions in the disc's own tilt.
-          vec2 d = vec2(q.x * cos(discTilt) + q.y * sin(discTilt), -q.x * sin(discTilt) + q.y * cos(discTilt));
-          float angle = atan(d.y, d.x); // 0 = right, up = positive
-
-          // ---- Far side of the disc, bent over the top and under the bottom ----
-          // Light from the part of the disc BEHIND the hole is bent around it,
-          // so it shows as a bright arc hugging the hole: a wide one over the
-          // top and a thinner, dimmer one underneath. Each point on an arc
-          // shows a point on the far half of the disc, so it swirls too.
-          float overTop = d.y > 0.0 ? 1.0 : 0.0;
-          float arcWidth = mix(0.4, 1.0, overTop);    // thinner underneath
-          float arcInner = 1.1;
-          float arcOuter = arcInner + arcWidth;
-          if (r > arcInner && r < arcOuter + 0.2) {
-            float rho = ${f(DISC_INNER)} + (r - arcInner) / arcWidth * ${f(DISC_OUTER - DISC_INNER)};
-            float phi = abs(angle);                     // the far half of the disc
-            float arcLight = gas(rho, phi) * mix(0.7, 1.4, overTop)
-                           * (1.0 - smoothstep(arcOuter - 0.15, arcOuter + 0.2, r))
-                           * smoothstep(arcInner, arcInner + 0.05, r);
-            // Strongest straight above and below, blending into the flat disc at the sides.
-            arcLight *= 0.45 + 0.55 * smoothstep(0.0, 0.6, abs(sin(angle)));
-            arcLight *= power;
-            color = color * (1.0 - clamp(arcLight * 1.5, 0.0, 0.95)) + gasColor(arcLight);
+          // ---- The whirlpool, seen from above at an angle ----
+          // Turn to the whirlpool's own tilt, then un-squash to measure
+          // distances flat across it.
+          vec2 d = vec2(q.x * cos(swirlTilt) + q.y * sin(swirlTilt), -q.x * sin(swirlTilt) + q.y * cos(swirlTilt));
+          float depth = d.y / ${f(SQUASH)};     // > 0 = far side (behind the hole), < 0 = near side
+          float rho = max(length(vec2(d.x, depth)), 0.001);
+          float gas = 0.0;
+          if (rho < ${f(SWIRL)}) {
+            gas = whirlpool(rho, atan(depth, d.x));
+            gas *= 1.0 - 0.25 * d.x / rho; // the side swirling towards us is a little brighter
           }
 
-          // ---- The flat disc, seen nearly edge-on ----
-          float depth = d.y / ${f(DISC_FLATNESS)};         // > 0 = far side, < 0 = near side
-          float rho = length(vec2(d.x, depth));
-          vec3 discLight = vec3(0.0);
-          float discAmount = 0.0;
-          if (rho > ${f(DISC_INNER)} && rho < ${f(DISC_OUTER)}) {
-            float light = gas(rho, atan(depth, d.x));
-            // The side spinning towards us (left) is brighter.
-            light *= (1.0 - 0.5 * d.x / rho) * power;
-            discLight = gasColor(light);
-            discAmount = clamp(light * 1.5, 0.0, 0.95); // solid enough to show against a bright day sky
-          }
-          // Far half of the flat disc goes behind the hole...
-          if (depth > 0.0) color = color * (1.0 - discAmount) + discLight;
+          // Far half of the whirlpool goes behind the hole...
+          if (depth > 0.0) color = addGas(color, rho, gas, power);
 
-          // ---- The hole: black, with a soft edge ----
-          float shadow = 1.0 - smoothstep(0.86, 1.0, r);
-          color = mix(color, holeShadow, shadow);
+          // ...then the hole itself, with a soft edge...
+          float hole = 1.0 - smoothstep(0.7, 1.05, r);
+          color = mix(color, holeShadow, hole);
 
-          // ---- A thin, blazing ring right at its edge, with a soft halo ----
-          float ring = exp(-pow((r - 1.0) / 0.028, 2.0)) * 2.2
-                     + exp(-max(r - 1.0, 0.0) / 0.12) * step(1.0, r) * 0.35;
-          color += ringInner * ring * power;
+          // ...and the near half pours over its edge, eating into the
+          // bottom of the hole.
+          if (depth <= 0.0) color = addGas(color, rho, gas, power);
 
-          // ...and the near half of the flat disc crosses in front of the hole.
-          if (depth <= 0.0) color = color * (1.0 - discAmount) + discLight;
+          // Faint, sparkly ring of bent starlight, where light from stars
+          // right behind it ends up. Hidden wherever the gas is thick.
+          float einstein = sqrt(${f(BH.bendStrength)});
+          float around = atan(q.y, q.x);
+          float beads = smoothstep(0.55, 0.85, noise(vec3(cos(around) * 9.0, sin(around) * 9.0, 0.0)));
+          color += starColor * (0.05 + 0.45 * beads) * exp(-pow((r - einstein) / 0.06, 2.0))
+                 * starsVisible * (1.0 - clamp(gas * 1.6, 0.0, 1.0));
         }
 
         gl_FragColor = vec4(color, 1.0);

@@ -66,26 +66,37 @@ export const THEME = {
     },
   ],
   // The black hole every planet orbits, drawn into the sky in sky.js.
-  // A dark hole edged by a thin blazing ring; a flat disc of glowing gas
-  // swirling around it and spiralling inwards; the far side of that disc bent
-  // up over the top and under the bottom of the hole; a soft glow. Stars and
-  // the galaxy band are bent around it too. It sits high in the northern sky;
-  // at night the stars wheel around it.
+  // A soft-edged dark hole at the centre of a big fiery whirlpool: thick
+  // spiral arms of gas, seen from above at an angle, swirling round and being
+  // sucked in. Dark red outside, orange in the middle, white-hot where it
+  // falls in. A soft glow spreads into the sky, and by day the sky around it
+  // darkens, as if it's swallowing the daylight. Stars and the galaxy band
+  // are bent around it. It sits high in the northern sky; at night the stars
+  // wheel around it.
   blackHole: {
     height: 40,                // degrees above the horizon
-    discTilt: 8,               // degrees the glowing disc is tipped from flat
-    shadow: '#000000',         // the black centre
-    ringInner: '#fff2d8',      // hottest light, close to the centre
-    ringOuter: '#ff9a4a',      // cooler light at the outer edge of the disc
-    glow: '#ff8c40',           // soft glow spreading into the sky
-    nightBoost: 0.8,           // how much brighter the disc and glow get at night (0 = same as day)
-    swirlSpeed: 0.7,           // how fast the gas swirls around (bigger = faster, 0 = still)
-    inflowSpeed: 0.35,         // how fast streaks of gas spiral inwards and vanish
+    viewAngle: 55,             // how far above the whirlpool we see it from
+                               // (90 = straight down on it, 0 = edge-on)
+    tilt: 15,                  // degrees the whirlpool is turned on the sky
+    swirlSize: 2.5,            // outer edge of the whirlpool, in hole radii
+    armCount: 3,               // number of spiral arms
+    armTwist: 1.6,             // how tightly the arms wind (bigger = more coiled)
+    turbulence: 0.9,           // how ragged and churning the arms are (0 = smooth)
+    swirlSpeed: 0.6,           // how fast it turns (bigger = faster, 0 = still)
+    inflowSpeed: 0.35,         // how fast clumps of gas get sucked inwards
+    shadow: '#000000',         // the hole
+    gasOuter: '#5e0f08',       // dark red at the outside
+    gasMiddle: '#ff5a14',      // orange in the middle
+    gasInner: '#fff1d6',       // white-hot where it falls in
+    glow: '#ff6a2a',           // soft glow spreading into the sky
+    nightBoost: 0.6,           // how much brighter the gas and glow get at night (0 = same as day)
+    dayDarkening: 0.7,         // by day, how much the sky around it darkens (0 = not at all)
+    dayDarkColor: '#1e0e16',   // the colour that patch of sky darkens towards
     bendStrength: 5,           // how strongly it bends the light of stars behind it
 
     // How it looks from each planet. The closer the planet, the bigger it looks.
-    //   size:       radius of the black centre, in degrees of sky. The disc
-    //               reaches about 4.5 times further, the glow further still.
+    //   size:       radius of the hole, in degrees of sky. The whirlpool
+    //               reaches swirlSize times further, the glow further still.
     //   brightness: 1 = normal, higher = more blazing
     // Later planets get their own line here, e.g. waterWorld: { size: 12, brightness: 1.6 }.
     perPlanet: {
