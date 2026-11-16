@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BLOCK, isBreakableId, dropId } from './blocks.js';
 import { THEME } from './theme.js';
+import { bendMaterial, unbendPoint } from './curve.js';
 
 // Breaking and placing blocks: finds the block under the crosshair,
 // draws an outline around it, and handles mouse clicks.
@@ -8,6 +9,10 @@ import { THEME } from './theme.js';
 // Broken blocks go into the inventory; placing a block uses one up.
 
 const REACH = 5; // how far away (in blocks) you can break/place
+
+// The line of sight is checked in small steps. Smaller = more exact but slower.
+const RAY_STEP = 0.05;   // blocks between checks
+const REFINE_STEPS = 12; // extra checks to find exactly where the ray enters a block
 
 export class Interaction {
   constructor(camera, world, player, scene, hotbar, inventory) {
@@ -17,13 +22,16 @@ export class Interaction {
     this.hotbar = hotbar;
     this.inventory = inventory;
     this.direction = new THREE.Vector3();
+    this.drawnPoint = new THREE.Vector3(); // a point along the line of sight, as drawn
+    this.flatPoint = new THREE.Vector3();  // the same point in the flat game world
 
     // Wireframe box drawn around the targeted block. Slightly bigger
     // than a block so the lines don't flicker against the block's faces.
     const box = new THREE.BoxGeometry(1.004, 1.004, 1.004);
     this.outline = new THREE.LineSegments(
       new THREE.EdgesGeometry(box),
-      new THREE.LineBasicMaterial({ color: THEME.blockOutline })
+      // Bent like the blocks, so it lines up with them exactly (curve.js).
+      bendMaterial(new THREE.LineBasicMaterial({ color: THEME.blockOutline }))
     );
     this.outline.visible = false;
     scene.add(this.outline);
@@ -77,51 +85,61 @@ export class Interaction {
     if (hit) this.outline.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
   }
 
-  // Walk along the line of sight one block boundary at a time and return
-  // the first solid block within reach, plus which face we hit
-  // (nx, ny, nz points out of that face). Returns null if nothing is in reach.
+  // Find the first solid block along the line of sight, within reach, plus
+  // which face we hit (nx, ny, nz points out of that face). Returns null if
+  // nothing is in reach.
+  //
+  // The world is DRAWN curved but the blocks are really flat (curve.js). The
+  // line of sight is straight in the drawn picture, so we walk along it in
+  // small steps and turn each step back into flat-world coordinates. That way
+  // you always hit the block you can see under the crosshair.
   raycast() {
     const origin = this.camera.position;
     const dir = this.camera.getWorldDirection(this.direction);
 
-    // The block the ray starts in.
-    let x = Math.floor(origin.x);
-    let y = Math.floor(origin.y);
-    let z = Math.floor(origin.z);
-
-    // Which way we step along each axis (+1, -1, or 0).
-    const stepX = Math.sign(dir.x);
-    const stepY = Math.sign(dir.y);
-    const stepZ = Math.sign(dir.z);
-
-    // How far along the ray it takes to cross one whole block on each axis.
-    const deltaX = stepX !== 0 ? Math.abs(1 / dir.x) : Infinity;
-    const deltaY = stepY !== 0 ? Math.abs(1 / dir.y) : Infinity;
-    const deltaZ = stepZ !== 0 ? Math.abs(1 / dir.z) : Infinity;
-
-    // How far along the ray until we cross the *next* block edge on each axis.
-    const firstEdge = (pos, cell, step, delta) => {
-      if (step > 0) return (cell + 1 - pos) * delta;
-      if (step < 0) return (pos - cell) * delta;
-      return Infinity;
-    };
-    let nextX = firstEdge(origin.x, x, stepX, deltaX);
-    let nextY = firstEdge(origin.y, y, stepY, deltaY);
-    let nextZ = firstEdge(origin.z, z, stepZ, deltaZ);
-
-    while (true) {
-      // Step into whichever neighbouring block the ray reaches first.
-      let distance;
-      let nx = 0, ny = 0, nz = 0;
-      if (nextX < nextY && nextX < nextZ) {
-        x += stepX; distance = nextX; nextX += deltaX; nx = -stepX;
-      } else if (nextY < nextZ) {
-        y += stepY; distance = nextY; nextY += deltaY; ny = -stepY;
-      } else {
-        z += stepZ; distance = nextZ; nextZ += deltaZ; nz = -stepZ;
+    let air = this.cellAt(origin, dir, 0); // the block the ray starts in
+    let airT = 0;
+    for (let t = RAY_STEP; t <= REACH; t += RAY_STEP) {
+      const cell = this.cellAt(origin, dir, t);
+      if (cell.x === air.x && cell.y === air.y && cell.z === air.z) continue;
+      if (!this.world.isSolid(cell.x, cell.y, cell.z)) {
+        air = cell;
+        airT = t;
+        continue;
       }
-      if (distance > REACH) return null;
-      if (this.world.isSolid(x, y, z)) return { x, y, z, nx, ny, nz };
+      // Found a solid block somewhere between airT and t. Narrow down
+      // exactly where the ray crosses into it, so we know which face it hit.
+      let solid = cell;
+      let lo = airT;
+      let hi = t;
+      for (let i = 0; i < REFINE_STEPS; i++) {
+        const mid = (lo + hi) / 2;
+        const c = this.cellAt(origin, dir, mid);
+        if (this.world.isSolid(c.x, c.y, c.z)) { solid = c; hi = mid; }
+        else { air = c; lo = mid; }
+      }
+      return { ...solid, ...faceBetween(air, solid) };
     }
+    return null;
   }
+
+  // The flat-world block at distance t along the (drawn) line of sight.
+  cellAt(origin, dir, t) {
+    this.drawnPoint.copy(origin).addScaledVector(dir, t);
+    const p = unbendPoint(this.drawnPoint, origin.x, this.flatPoint);
+    return { x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z) };
+  }
+}
+
+// Which face of `solid` the ray came through, from the air block just before it.
+// Normally they differ along exactly one axis. If the ray slipped exactly
+// through an edge or corner, pick one axis (up/down first, as that's most
+// common when building).
+function faceBetween(air, solid) {
+  const dx = Math.sign(air.x - solid.x);
+  const dy = Math.sign(air.y - solid.y);
+  const dz = Math.sign(air.z - solid.z);
+  if (dy !== 0) return { nx: 0, ny: dy, nz: 0 };
+  if (dx !== 0) return { nx: dx, ny: 0, nz: 0 };
+  return { nx: 0, ny: 0, nz: dz };
 }

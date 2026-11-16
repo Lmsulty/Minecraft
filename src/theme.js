@@ -43,6 +43,16 @@ export const THEME = {
   },
   stars: '#ffffff',
 
+  // ---- Space station: the world is drawn as the inside of a cylinder (curve.js) ----
+  // Only the drawing bends; walking, building and saving stay flat.
+  station: {
+    curveRadius: 128,     // blocks from the ground to the middle of the cylinder.
+                          // Smaller = stronger curve (96 is dramatic, 192 is subtle).
+                          // Must stay bigger than the build height above ground.
+    curveGroundLevel: 48, // the height that bends at exactly that radius
+                          // (average ground level, see BASE_HEIGHT in terrain.js)
+  },
+
   // ---- In the world ----
   blockOutline: '#000000', // box around the block you're aiming at
 

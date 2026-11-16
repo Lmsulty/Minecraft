@@ -12,6 +12,7 @@ import { CreativeToggle } from './creative.js';
 import { InventoryScreen } from './inventoryScreen.js';
 import { applyUiTheme } from './theme.js';
 import { DayNight } from './dayNight.js';
+import { updateCurve, cullBentChunks } from './curve.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
@@ -135,6 +136,8 @@ function loop(now) {
   player.update(dt);
   interaction.update();
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera
+  updateCurve(camera);                   // the cylinder bend starts at the camera
+  cullBentChunks(world.group, camera);   // skip chunks that are off-screen (after bending)
   renderer.render(scene, camera);
   fps.update(); // after render, so it can read this frame's draw calls
   requestAnimationFrame(loop);

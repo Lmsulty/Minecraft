@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { BLOCK_TYPES } from './blocks.js';
 import { createAtlasTexture, getTileUV } from './textures.js';
 import { THEME, hexToRgb } from './theme.js';
+import { bendMaterial } from './curve.js';
 
 // Turns a chunk's block data into a mesh Three.js can draw.
 // Every block face that could be seen (its neighbour doesn't hide it) is added
@@ -24,12 +25,13 @@ const MARGIN = LIGHT_SPREAD; // look this far into neighbouring chunks, so light
 const atlas = createAtlasTexture();
 const MATERIALS = {
   // Normal blocks: every pixel solid. vertexColors = use the per-face light tint.
-  opaque: new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true }),
+  // All three are bent so the world looks like the inside of a cylinder (curve.js).
+  opaque: bendMaterial(new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true })),
   // See-through-pixel blocks (e.g. leaves later): pixels with alpha below 0.5
   // are simply not drawn, so you see through the gaps.
-  cutout: new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: 0.5 }),
+  cutout: bendMaterial(new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: 0.5 })),
   // Glowing blocks: ignore the sun and moon, so they look lit even at night.
-  glow: new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true }),
+  glow: bendMaterial(new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true })),
 };
 
 // ---- Brightness for each light level ----
@@ -289,7 +291,10 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
   const group = new THREE.Group();
   for (const [renderType, list] of Object.entries(lists)) {
     if (list.isEmpty()) continue;
-    group.add(new THREE.Mesh(list.toGeometry(), MATERIALS[renderType]));
+    const mesh = new THREE.Mesh(list.toGeometry(), MATERIALS[renderType]);
+    // Off-screen checks use the bent positions instead (cullBentChunks in curve.js).
+    mesh.frustumCulled = false;
+    group.add(mesh);
   }
   return group;
 }
