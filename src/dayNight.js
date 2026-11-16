@@ -61,6 +61,10 @@ export class DayNight {
     dome.holeDirection.value.set(0, Math.sin(height), -Math.cos(height));
     dome.holeUp.value.set(0, Math.cos(height), Math.sin(height));
     dome.holeRight.value.crossVectors(dome.holeDirection.value, dome.holeUp.value);
+    // The galaxy band passes through the black hole, tipped by galaxyTilt.
+    const tilt = THREE.MathUtils.degToRad(THEME.starfield.galaxyTilt);
+    dome.galaxyNormal.value.copy(dome.holeUp.value).multiplyScalar(Math.cos(tilt))
+      .addScaledVector(dome.holeRight.value, Math.sin(tilt));
 
     document.addEventListener('keydown', (e) => {
       if (e.code === 'KeyT' && !e.repeat) this.fast = !this.fast;
@@ -74,6 +78,7 @@ export class DayNight {
     const speed = this.fast ? FAST_SPEED : 1;
     this.hour = (this.hour + (Math.max(0, dt) * speed * 24) / DAY_LENGTH_SECONDS) % 24;
 
+    this.dome.material.uniforms.time.value += Math.max(0, dt); // real seconds: the black hole's gas keeps swirling
     this.blendKeyframes();
     this.moveSkyObjects();
   }

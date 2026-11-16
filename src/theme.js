@@ -66,10 +66,11 @@ export const THEME = {
     },
   ],
   // The black hole every planet orbits, drawn into the sky in sky.js.
-  // A black centre, a thin blazing ring hugging it, a wide flat glowing disc
-  // seen nearly edge-on, and a soft glow. Stars and sky right around it are
-  // bent outwards, like light passing something extremely heavy.
-  // It sits high in the northern sky; at night the stars wheel around it.
+  // A dark hole edged by a thin blazing ring; a flat disc of glowing gas
+  // swirling around it and spiralling inwards; the far side of that disc bent
+  // up over the top and under the bottom of the hole; a soft glow. Stars and
+  // the galaxy band are bent around it too. It sits high in the northern sky;
+  // at night the stars wheel around it.
   blackHole: {
     height: 40,                // degrees above the horizon
     discTilt: 8,               // degrees the glowing disc is tipped from flat
@@ -78,6 +79,9 @@ export const THEME = {
     ringOuter: '#ff9a4a',      // cooler light at the outer edge of the disc
     glow: '#ff8c40',           // soft glow spreading into the sky
     nightBoost: 0.8,           // how much brighter the disc and glow get at night (0 = same as day)
+    swirlSpeed: 0.7,           // how fast the gas swirls around (bigger = faster, 0 = still)
+    inflowSpeed: 0.35,         // how fast streaks of gas spiral inwards and vanish
+    bendStrength: 5,           // how strongly it bends the light of stars behind it
 
     // How it looks from each planet. The closer the planet, the bigger it looks.
     //   size:       radius of the black centre, in degrees of sky. The disc
@@ -88,7 +92,15 @@ export const THEME = {
       home: { size: 2.6, brightness: 1 }, // the farthest planet: smallest view (about 23 degrees across)
     },
   },
-  stars: '#ffffff',          // star colour (stars are drawn into the sky in sky.js)
+  // Night sky (drawn into the sky in sky.js). Stars fade in through dusk.
+  starfield: {
+    color: '#ffffff',
+    density: 1,                // 1 = normal, 2 = twice as many stars, 0.5 = half
+    galaxyBand: 0.35,          // brightness of the faint galaxy band (0 = none)
+    galaxyColor: '#cfc4ee',
+    galaxyWidth: 0.12,         // how wide the band is (0.1 = narrow, 0.3 = wide)
+    galaxyTilt: 30,            // degrees the band is tipped as it passes the black hole
+  },
 
   // ---- Easter egg: curved world (press B in game, see curve.js) ----
   // Draws the world as if you're inside a giant spinning cylinder.
