@@ -4,7 +4,7 @@ import { makeRandom } from './random.js';
 import { treeAtColumn, treeBlockAt } from './trees.js';
 
 // Decides what the untouched world looks like at any spot: hills, caves,
-// sinkholes and hillside entrances leading into them, trees, and the unbreakable floor. It only uses seeded noise, so the same seed always
+// sinkholes and hillside entrances leading into them, sand in low ground, trees, and the unbreakable floor. It only uses seeded noise, so the same seed always
 // gives the same world, and any chunk can be thrown away and rebuilt
 // identically later. world.js (generating chunks) and the save system
 // (blockAt) both use the SAME functions here, so they always agree.
@@ -17,6 +17,18 @@ export const SPAWN = { x: 8, z: 8 };
 const BASE_HEIGHT = 48;  // average ground level (world is 96 tall)
 const HILL_HEIGHT = 8;   // how far hills rise/fall from the average
 const DIRT_DEPTH = 3;    // dirt layers under the grass
+
+// ---- Sand settings ----
+// Patches of sand form in low-lying ground (hollows and valleys), like
+// dried-up ponds. A column is sand if it's low enough AND its "sand noise"
+// (a seeded pattern of blobs) plus a bonus for being extra low is high enough.
+const SAND = {
+  maxHeight: 45,      // ground must be at or below this height (average ground is 48)
+  patchScale: 0.06,   // smaller = bigger, smoother patches
+  threshold: 0.15,    // -1 to 1. Bigger = fewer, smaller patches; -1 = every low spot
+  lowlandBonus: 0.12, // each block lower than maxHeight makes sand this much more likely
+  depth: 3,           // sand layers, counting the top one. Stone underneath.
+};
 
 // ---- Cave settings ----
 const CAVE_MIN_Y = 2;          // caves never go below this, so the floor stays thick
@@ -90,6 +102,8 @@ export class Terrain {
     this.tunnelA = createNoise3D(rand);
     this.tunnelB = createNoise3D(rand);
     this.cavern = createNoise3D(rand);
+    // Sand gets its own random numbers, so adding it never changed the hills or caves.
+    this.sandNoise = createNoise2D(makeRandom((seed ^ 0x5a4d5a4d) >>> 0));
     this.starter = this.pickStarterSinkhole();
   }
 
@@ -122,7 +136,15 @@ export class Terrain {
     // Hillside tunnels passing over/under this column.
     const nearby = this.tunnelsNearCell(Math.floor(x / HILLSIDE_CELL), Math.floor(z / HILLSIDE_CELL));
     const tunnels = nearby.filter((t) => x >= t.minX && x <= t.maxX && z >= t.minZ && z <= t.maxZ);
-    return { height: this.height(x, z), sinkholes, tunnels };
+    const height = this.height(x, z);
+    return { height, sinkholes, tunnels, sand: this.isSandy(x, z, height) };
+  }
+
+  // Is the ground at column (x, z) sand instead of grass? (see SAND settings)
+  isSandy(x, z, height) {
+    if (height > SAND.maxHeight) return false;
+    const blobs = this.sandNoise(x * SAND.patchScale, z * SAND.patchScale);
+    return blobs + (SAND.maxHeight - height) * SAND.lowlandBonus > SAND.threshold;
   }
 
   // Every hillside tunnel that could reach into a cell. A tunnel can stretch into
@@ -394,6 +416,7 @@ export class Terrain {
     // Above the ground: a tree, or open air. (Trees never fill caves.)
     if (y > col.height) return col.tree ? treeBlockAt(col.tree, x, y, z) : BLOCK.AIR;
     if (this.isCave(x, y, z, col)) return BLOCK.AIR;
+    if (col.sand) return y > col.height - SAND.depth ? BLOCK.SAND : BLOCK.STONE;
     if (y === col.height) return BLOCK.GRASS;
     if (y >= col.height - DIRT_DEPTH) return BLOCK.DIRT;
     return BLOCK.STONE;
