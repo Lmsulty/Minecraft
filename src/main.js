@@ -10,7 +10,7 @@ import { Hotbar } from './hotbar.js';
 import { Inventory } from './inventory.js';
 import { CreativeToggle } from './creative.js';
 import { InventoryScreen } from './inventoryScreen.js';
-import { applyUiTheme } from './theme.js';
+import { THEME, applyUiTheme } from './theme.js';
 import { DayNight } from './dayNight.js';
 import { updateCurve, cullBentChunks } from './curve.js';
 
@@ -23,13 +23,13 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// ---- Scene: sky colour and distance fog ----
+// ---- Scene: background and air haze ----
 // The actual colours are set by the day/night cycle (dayNight.js + theme.js).
+// The haze fades land out before the edge of the loaded chunks (about 80 blocks
+// away), so the world seems to go on forever. How it fades: curve.js.
 const scene = new THREE.Scene();
 scene.background = new THREE.Color();
-// Fades out before the edge of the loaded chunks (about 80 blocks away),
-// so the world seems to go on forever.
-scene.fog = new THREE.Fog(0xffffff, 45, 78);
+scene.fog = new THREE.Fog(0xffffff, THEME.station.hazeStart, THEME.station.hazeEnd);
 
 // ---- Lights: soft sky light + a sun/moon, so each cube face gets a different shade ----
 const ambientLight = new THREE.HemisphereLight();

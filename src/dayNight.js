@@ -3,7 +3,7 @@ import { THEME, hexToRgb } from './theme.js';
 import { makeRandom } from './random.js';
 
 // Day/night cycle: a game clock, the sun and moon moving across the sky,
-// stars at night, and the sky, fog and lights fading between the
+// stars at night, and the air haze and lights fading between the
 // keyframes in theme.js. Press T to speed time up (and T again to go back).
 
 // ---- Timing ----
@@ -41,7 +41,7 @@ export class DayNight {
     this.keyframes = THEME.skyKeyframes
       .map((k) => ({
         ...k,
-        sky: new THREE.Color(k.sky),
+        haze: new THREE.Color(k.haze),
         light: new THREE.Color(k.light),
         ambientSky: new THREE.Color(k.ambientSky),
         ambientGround: new THREE.Color(k.ambientGround),
@@ -89,8 +89,10 @@ export class DayNight {
     if (now < start) now += 24;
     const t = smooth((now - start) / (end - start));
 
-    this.scene.background.lerpColors(a.sky, b.sky, t);
-    this.scene.fog.color.copy(this.scene.background); // fog always matches the sky
+    // The air haze: distant land fades into it, and it fills the background,
+    // so the edge of the loaded world blends away.
+    this.scene.fog.color.lerpColors(a.haze, b.haze, t);
+    this.scene.background.copy(this.scene.fog.color);
     this.ambientLight.color.lerpColors(a.ambientSky, b.ambientSky, t);
     this.ambientLight.groundColor.lerpColors(a.ambientGround, b.ambientGround, t);
     this.ambientLight.intensity = a.ambientStrength + (b.ambientStrength - a.ambientStrength) * t;

@@ -13,6 +13,8 @@ import { THEME } from './theme.js';
 //   - The bend is measured from the camera, so the area around you is
 //     never distorted. Land always rises on both sides of you.
 //
+//  It also handles the air haze: distant land fading into the haze colour.
+//
 //  Settings live in theme.js (THEME.station). Press B to turn the curve
 //  off and on, to compare.
 // ==========================================================
@@ -53,6 +55,16 @@ const BEND_GLSL = /* glsl */ `
   }
 `;
 
+// ---- Air haze (replaces Three.js's normal fog in bent materials) ----
+// fogNear/fogFar come from scene.fog (hazeStart/hazeEnd in theme.js).
+const HAZE_GLSL = /* glsl */ `
+  #ifdef USE_FOG
+    float hazeT = smoothstep(fogNear, fogFar, vFogDepth);
+    float fogFactor = ${S.hazeMax.toFixed(3)} * pow(hazeT, ${S.hazeCurve.toFixed(3)});
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor);
+  #endif
+`;
+
 // Add the bend to a Three.js material. The lighting still uses the flat
 // world's directions, so every patch of land is lit as if light comes
 // from its own "up" (towards the middle of the cylinder).
@@ -60,15 +72,23 @@ export function bendMaterial(material) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uBendCenterX = uniforms.uBendCenterX;
     shader.uniforms.uBendOn = uniforms.uBendOn;
-    shader.vertexShader = BEND_GLSL + shader.vertexShader.replace(
-      '#include <project_vertex>',
-      /* glsl */ `
+    shader.vertexShader = BEND_GLSL + shader.vertexShader
+      .replace('#include <project_vertex>', /* glsl */ `
         vec4 bentWorld = modelMatrix * vec4(transformed, 1.0);
         bentWorld.xyz = bendPoint(bentWorld.xyz);
         vec4 mvPosition = viewMatrix * bentWorld;
         gl_Position = projectionMatrix * mvPosition;
-      `
-    );
+      `)
+      // Haze by the real straight-line distance to the (bent) point. The
+      // usual fog only measures straight ahead, so land at the edges of the
+      // screen and overhead would be too clear, and turning your head would
+      // change it.
+      .replace('#include <fog_vertex>', /* glsl */ `
+        #ifdef USE_FOG
+          vFogDepth = length(mvPosition.xyz);
+        #endif
+      `);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>', HAZE_GLSL);
   };
   // Tell Three.js this shader is different from an unbent one of the same type.
   material.customProgramCacheKey = () => 'bend';

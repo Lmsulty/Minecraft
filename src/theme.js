@@ -7,27 +7,28 @@
 // ==========================================================
 
 export const THEME = {
-  // ---- Sky, fog and light through the day ----
+  // ---- Air haze and light through the day ----
   // The game clock runs 0:00 -> 24:00 (one full day takes about 6 real minutes).
-  // Each keyframe is a snapshot of the sky at a certain hour. The game blends
+  // Each keyframe is a snapshot at a certain hour. The game blends
   // smoothly between the keyframes on either side of the current time.
   //
-  //   sky:           sky colour (the fog uses the same colour so far terrain fades into it)
-  //   light:         colour of the sun by day, or the moon by night
-  //   lightStrength: how bright that sun/moon light is
+  //   haze:          colour of the air inside the station. Distant land fades
+  //                  into it, and it fills the background behind everything.
+  //   light:         colour of the main light (sun by day, moon by night, for now)
+  //   lightStrength: how bright that light is
   //   ambientSky:    soft light coming from above
   //   ambientGround: soft light bouncing up from below (shades the undersides)
   //   ambientStrength: how bright the soft light is
   //   stars:         0 = no stars, 1 = fully visible stars
   skyKeyframes: [
-    { hour: 4,  name: 'night',   sky: '#0b1026', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#141820', ambientStrength: 0.45, stars: 1 },
-    { hour: 5,  name: 'dawn',    sky: '#5b4a7a', light: '#c49ac0', lightStrength: 0.5,  ambientSky: '#7a6a9a', ambientGround: '#2a2430', ambientStrength: 0.55, stars: 0.5 },
-    { hour: 6,  name: 'sunrise', sky: '#f2a46b', light: '#ffc58a', lightStrength: 1.0,  ambientSky: '#ffd9b0', ambientGround: '#5a4a40', ambientStrength: 0.85, stars: 0 },
-    { hour: 8,  name: 'day',     sky: '#87ceeb', light: '#ffffff', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#666666', ambientStrength: 1.2,  stars: 0 },
-    { hour: 18, name: 'day',     sky: '#87ceeb', light: '#ffffff', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#666666', ambientStrength: 1.2,  stars: 0 },
-    { hour: 19.5, name: 'sunset', sky: '#f08a4b', light: '#ff9a50', lightStrength: 1.0, ambientSky: '#ffbf8f', ambientGround: '#4f3f38', ambientStrength: 0.8,  stars: 0 },
-    { hour: 21, name: 'dusk',    sky: '#3e3463', light: '#9b8bc8', lightStrength: 0.45, ambientSky: '#5a5080', ambientGround: '#1e1a26', ambientStrength: 0.5,  stars: 0.6 },
-    { hour: 22, name: 'night',   sky: '#0b1026', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#141820', ambientStrength: 0.45, stars: 1 },
+    { hour: 4,  name: 'night',   haze: '#10142a', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#141820', ambientStrength: 0.45, stars: 1 },
+    { hour: 5,  name: 'dawn',    haze: '#655a82', light: '#c49ac0', lightStrength: 0.5,  ambientSky: '#7a6a9a', ambientGround: '#2a2430', ambientStrength: 0.55, stars: 0.5 },
+    { hour: 6,  name: 'sunrise', haze: '#e8b48c', light: '#ffc58a', lightStrength: 1.0,  ambientSky: '#ffd9b0', ambientGround: '#5a4a40', ambientStrength: 0.85, stars: 0 },
+    { hour: 8,  name: 'day',     haze: '#a9c8d4', light: '#ffffff', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#666666', ambientStrength: 1.2,  stars: 0 },
+    { hour: 18, name: 'day',     haze: '#a9c8d4', light: '#ffffff', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#666666', ambientStrength: 1.2,  stars: 0 },
+    { hour: 19.5, name: 'sunset', haze: '#e09a6a', light: '#ff9a50', lightStrength: 1.0, ambientSky: '#ffbf8f', ambientGround: '#4f3f38', ambientStrength: 0.8,  stars: 0 },
+    { hour: 21, name: 'dusk',    haze: '#454066', light: '#9b8bc8', lightStrength: 0.45, ambientSky: '#5a5080', ambientGround: '#1e1a26', ambientStrength: 0.5,  stars: 0.6 },
+    { hour: 22, name: 'night',   haze: '#10142a', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#141820', ambientStrength: 0.45, stars: 1 },
   ],
 
   // ---- Things in the sky ----
@@ -51,6 +52,16 @@ export const THEME = {
                           // Must stay bigger than the build height above ground.
     curveGroundLevel: 48, // the height that bends at exactly that radius
                           // (average ground level, see BASE_HEIGHT in terrain.js)
+
+    // Air haze: how distant land fades into the haze colour (keyframes above).
+    // Distances are in blocks, measured straight from your eye to the block.
+    hazeStart: 28,        // fully clear up to here
+    hazeEnd: 78,          // fully hazed from here. Must stay at or below ~78,
+                          // or you'd see the edge of the loaded world.
+    hazeCurve: 2,         // 1 = fades evenly. Bigger = stays clear longer, then
+                          // fades quickly near the end (so the rising land shows).
+    hazeMax: 1,           // how hazy the farthest land gets (1 = disappears).
+                          // Lowered later, once the far side of the cylinder is drawn.
   },
 
   // ---- In the world ----
