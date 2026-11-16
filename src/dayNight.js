@@ -40,6 +40,8 @@ export class DayNight {
         ...k,
         sky: new THREE.Color(k.sky),
         skyTop: new THREE.Color(k.skyTop),
+        cloudLit: new THREE.Color(k.cloudLit),
+        cloudShade: new THREE.Color(k.cloudShade),
         light: new THREE.Color(k.light),
         ambientSky: new THREE.Color(k.ambientSky),
         ambientGround: new THREE.Color(k.ambientGround),
@@ -107,6 +109,8 @@ export class DayNight {
     const dome = this.dome.material.uniforms;
     dome.horizon.value.copy(this.scene.fog.color);
     dome.top.value.lerpColors(a.skyTop, b.skyTop, t);
+    dome.cloudLit.value.lerpColors(a.cloudLit, b.cloudLit, t);
+    dome.cloudShade.value.lerpColors(a.cloudShade, b.cloudShade, t);
     this.ambientLight.color.lerpColors(a.ambientSky, b.ambientSky, t);
     this.ambientLight.groundColor.lerpColors(a.ambientGround, b.ambientGround, t);
     this.ambientLight.intensity = a.ambientStrength + (b.ambientStrength - a.ambientStrength) * t;

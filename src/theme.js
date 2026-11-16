@@ -22,16 +22,18 @@ export const THEME = {
   //   ambientSky:    soft light coming from above
   //   ambientGround: soft light bouncing up from below (shades the undersides)
   //   ambientStrength: how bright the soft light is
+  //   cloudLit:      colour of the sunny side of the clouds
+  //   cloudShade:    colour of the shaded side of the clouds
   //   stars:         0 = no stars, 1 = fully visible stars
   skyKeyframes: [
-    { hour: 4,  name: 'night',   sky: '#121a30', skyTop: '#04060e', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#16161c', ambientStrength: 0.45, stars: 1 },
-    { hour: 5,  name: 'dawn',    sky: '#6e5a7e', skyTop: '#232448', light: '#c49ac0', lightStrength: 0.5,  ambientSky: '#7a6a9a', ambientGround: '#2a2428', ambientStrength: 0.55, stars: 0.5 },
-    { hour: 6,  name: 'sunrise', sky: '#f0b484', skyTop: '#6c8cb4', light: '#ffc58a', lightStrength: 1.0,  ambientSky: '#ffd9b0', ambientGround: '#5a4a3a', ambientStrength: 0.85, stars: 0 },
-    { hour: 8,  name: 'day',     sky: '#c3d6d6', skyTop: '#5f9cc6', light: '#fff8ea', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#6a6458', ambientStrength: 1.2,  stars: 0 },
-    { hour: 18, name: 'day',     sky: '#c3d6d6', skyTop: '#5f9cc6', light: '#fff8ea', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#6a6458', ambientStrength: 1.2,  stars: 0 },
-    { hour: 19.5, name: 'sunset', sky: '#ec9662', skyTop: '#4e5888', light: '#ff9a50', lightStrength: 1.0, ambientSky: '#ffbf8f', ambientGround: '#4f3f32', ambientStrength: 0.8,  stars: 0 },
-    { hour: 21, name: 'dusk',    sky: '#4c3f66', skyTop: '#16162e', light: '#9b8bc8', lightStrength: 0.45, ambientSky: '#5a5080', ambientGround: '#1e1a22', ambientStrength: 0.5,  stars: 0.6 },
-    { hour: 22, name: 'night',   sky: '#121a30', skyTop: '#04060e', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#16161c', ambientStrength: 0.45, stars: 1 },
+    { hour: 4,  name: 'night',   sky: '#121a30', skyTop: '#04060e', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#16161c', ambientStrength: 0.45, cloudLit: '#2a3150', cloudShade: '#121626', stars: 1 },
+    { hour: 5,  name: 'dawn',    sky: '#6e5a7e', skyTop: '#232448', light: '#c49ac0', lightStrength: 0.5,  ambientSky: '#7a6a9a', ambientGround: '#2a2428', ambientStrength: 0.55, cloudLit: '#c49ab4', cloudShade: '#4a3a5a', stars: 0.5 },
+    { hour: 6,  name: 'sunrise', sky: '#f0b484', skyTop: '#6c8cb4', light: '#ffc58a', lightStrength: 1.0,  ambientSky: '#ffd9b0', ambientGround: '#5a4a3a', ambientStrength: 0.85, cloudLit: '#ffd08a', cloudShade: '#e8899a', stars: 0 },
+    { hour: 8,  name: 'day',     sky: '#c3d6d6', skyTop: '#5f9cc6', light: '#fff8ea', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#6a6458', ambientStrength: 1.2,  cloudLit: '#ffffff', cloudShade: '#b4c2d0', stars: 0 },
+    { hour: 18, name: 'day',     sky: '#c3d6d6', skyTop: '#5f9cc6', light: '#fff8ea', lightStrength: 1.8,  ambientSky: '#ffffff', ambientGround: '#6a6458', ambientStrength: 1.2,  cloudLit: '#ffffff', cloudShade: '#b4c2d0', stars: 0 },
+    { hour: 19.5, name: 'sunset', sky: '#ec9662', skyTop: '#4e5888', light: '#ff9a50', lightStrength: 1.0, ambientSky: '#ffbf8f', ambientGround: '#4f3f32', ambientStrength: 0.8,  cloudLit: '#ffbe6a', cloudShade: '#d66e8a', stars: 0 },
+    { hour: 21, name: 'dusk',    sky: '#4c3f66', skyTop: '#16162e', light: '#9b8bc8', lightStrength: 0.45, ambientSky: '#5a5080', ambientGround: '#1e1a22', ambientStrength: 0.5,  cloudLit: '#8c6c9e', cloudShade: '#2e2440', stars: 0.6 },
+    { hour: 22, name: 'night',   sky: '#121a30', skyTop: '#04060e', light: '#8fa6d8', lightStrength: 0.45, ambientSky: '#3a4a78', ambientGround: '#16161c', ambientStrength: 0.45, cloudLit: '#2a3150', cloudShade: '#121626', stars: 1 },
   ],
 
   // Distance haze: how far-away land fades into the horizon sky colour.
@@ -41,6 +43,20 @@ export const THEME = {
     start: 45,   // fully clear up to here
     end: 78,     // fully hazed from here
     curve: 1,    // 1 = fades evenly. Bigger = stays clear longer, then fades quickly.
+  },
+
+  // Soft painted clouds, drawn into the sky (sky.js). Their colours come from
+  // cloudLit / cloudShade in the keyframes above.
+  clouds: {
+    coverage: 0.5,             // 0 = clear sky, 1 = almost overcast
+    size: 1.5,                 // bigger = bigger, puffier clouds
+    softness: 0.18,            // how soft their edges are (small = crisp)
+    thinOverhead: 0.3,         // how much thinner they are straight overhead than near the horizon
+    driftSpeed: 0.02,          // how fast they drift across the sky (0 = still)
+    driftDirection: 70,        // which way they drift, in compass degrees
+    atNight: 0.3,              // how much cloud shows at night (0 = none, 1 = same as day),
+                               // kept low so the stars and galaxy still show
+    blackHolePull: 1.2,        // how strongly the black hole twists them into streaks (0 = not at all)
   },
 
   // ---- Things in the sky (drawn in sky.js) ----
