@@ -164,6 +164,13 @@ export const THEME = {
     '--inv-slot-border': 'rgba(255, 255, 255, 0.18)',
     '--inv-slot-hover': 'rgba(255, 255, 255, 0.16)',
     '--inv-slot-selected-border': '#ffffff',      // the hotbar slot in your hand
+
+    '--recipe-bg': 'rgba(255, 255, 255, 0.04)',   // recipe you can't craft yet (also faded)
+    '--recipe-border': 'rgba(255, 255, 255, 0.12)',
+    '--recipe-ready-bg': 'rgba(120, 200, 120, 0.14)', // recipe you can craft
+    '--recipe-ready-border': 'rgba(140, 220, 140, 0.6)',
+    '--recipe-hover-bg': 'rgba(120, 200, 120, 0.28)',
+    '--recipe-missing-text': '#ff8a7a',           // ingredient you don't have enough of
   },
 };
 

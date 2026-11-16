@@ -54,6 +54,15 @@ export class Inventory {
     return this.slots[this.selected];
   }
 
+  // How many of a block you have in total (all slots added up).
+  countOf(blockId) {
+    let total = 0;
+    for (const stack of this.slots) {
+      if (stack && stack.block === blockId) total += stack.count;
+    }
+    return total;
+  }
+
   // ---- Changing ----
 
   // Pick which hotbar slot is in your hand.
@@ -178,6 +187,57 @@ export class Inventory {
     this.held = null;
     this.fillRange(block, count, 0, INVENTORY_SIZE);
     this.changed();
+  }
+
+  // ---- Trading (used by crafting) ----
+
+  // Swap some blocks for others, all or nothing:
+  //   take: [{ block, count }, ...]  what gets used up
+  //   then `giveCount` of block `giveBlock` is added.
+  // Returns 'ready' if it worked, 'missing' if you don't have enough,
+  // or 'full' if the result wouldn't fit. dryRun = only check, change nothing.
+  trade(take, giveBlock, giveCount, { dryRun = false } = {}) {
+    const result = this.tradeOnce(take, giveBlock, giveCount, dryRun);
+    if (result === 'ready' && !dryRun) this.changed();
+    return result;
+  }
+
+  // Do the same trade up to `times` times. Returns how many times it worked.
+  tradeMany(take, giveBlock, giveCount, times) {
+    let done = 0;
+    while (done < times && this.tradeOnce(take, giveBlock, giveCount, false) === 'ready') done++;
+    if (done > 0) this.changed();
+    return done;
+  }
+
+  // One trade, without announcing the change.
+  tradeOnce(take, giveBlock, giveCount, dryRun) {
+    for (const { block, count } of take) {
+      if (this.countOf(block) < count) return 'missing';
+    }
+    // Copy every stack so we can undo if the result doesn't fit.
+    const before = this.slots.map((stack) => stack && { ...stack });
+    for (const { block, count } of take) this.removeBlock(block, count);
+    const left = this.fillRange(giveBlock, giveCount, 0, INVENTORY_SIZE);
+    if (left > 0 || dryRun) this.slots = before;
+    return left > 0 ? 'full' : 'ready';
+  }
+
+  // Take `count` of a block from anywhere, backpack first so your hotbar
+  // stays stocked. (Doesn't announce the change; the caller does.)
+  removeBlock(blockId, count) {
+    let left = count;
+    const order = [];
+    for (let i = INVENTORY_SIZE - 1; i >= 0; i--) order.push(i); // backpack end first, hotbar last
+    for (const i of order) {
+      const stack = this.slots[i];
+      if (!stack || stack.block !== blockId) continue;
+      const taken = Math.min(left, stack.count);
+      stack.count -= taken;
+      left -= taken;
+      if (stack.count === 0) this.slots[i] = null;
+      if (left === 0) break;
+    }
   }
 
   // Put `count` of a block into slots from..to-1: top up matching stacks

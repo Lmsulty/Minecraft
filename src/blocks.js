@@ -84,3 +84,9 @@ export function isBreakableId(id) {
 export function dropId(id) {
   return BLOCK_TYPES[id]?.drops ?? id;
 }
+
+// A block's name for showing on screen: 'planks' -> 'Planks'.
+export function blockDisplayName(id) {
+  const name = BLOCK_TYPES[id].name;
+  return name[0].toUpperCase() + name.slice(1);
+}

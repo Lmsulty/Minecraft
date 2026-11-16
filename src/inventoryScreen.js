@@ -1,7 +1,8 @@
 import './inventory.css';
-import { BLOCK_TYPES, isBreakableId } from './blocks.js';
+import { BLOCK_TYPES, isBreakableId, blockDisplayName } from './blocks.js';
 import { getBlockIconURL } from './blockIcons.js';
 import { HOTBAR_SIZE, INVENTORY_SIZE, MAX_STACK } from './inventory.js';
+import { CraftingPanel } from './craftingPanel.js';
 
 // The full inventory screen. Press E (or Tab) to open and close it.
 //
@@ -9,7 +10,8 @@ import { HOTBAR_SIZE, INVENTORY_SIZE, MAX_STACK } from './inventory.js';
 //   Right click       pick up half a stack, or put down one block
 //   Shift + click     send a stack between the hotbar and the backpack
 //
-// In creative mode a palette of every block is shown on the right:
+// On the right: the crafting list in normal mode (see craftingPanel.js).
+// In creative mode a palette of every block is shown there instead:
 // click one to pick up a full stack. Clicking the palette while holding
 // something throws the held stack away.
 //
@@ -64,7 +66,12 @@ export class InventoryScreen {
           <div class="inv-label">Hotbar</div>
           <div class="inv-grid inv-hotbar"></div>
         </div>
-        <div class="inv-side">
+        <div class="inv-side inv-crafting">
+          <h2 class="inv-title">Crafting</h2>
+          <p class="inv-hint">Click to craft.<br>Shift-click crafts as many as you can.</p>
+          <div class="recipe-list"></div>
+        </div>
+        <div class="inv-side inv-creative">
           <h2 class="inv-title">All blocks</h2>
           <p class="inv-hint">Click to take a stack.<br>Click while holding to discard.</p>
           <div class="inv-grid inv-palette"></div>
@@ -85,7 +92,9 @@ export class InventoryScreen {
     }
 
     // Creative palette: every block you could place (not air, not core rock).
-    this.side = this.root.querySelector('.inv-side');
+    this.creativeSide = this.root.querySelector('.inv-creative');
+    this.craftingSide = this.root.querySelector('.inv-crafting');
+    this.craftingPanel = new CraftingPanel(this.root.querySelector('.recipe-list'), this.inventory);
     const palette = this.root.querySelector('.inv-palette');
     for (const type of BLOCK_TYPES) {
       if (!type.textures || !isBreakableId(type.id)) continue;
@@ -124,7 +133,7 @@ export class InventoryScreen {
       if (img.getAttribute('src') !== src) img.src = src;
       img.style.visibility = 'visible';
       count.textContent = stack.count > 1 ? stack.count : '';
-      el.title = blockName(stack.block);
+      el.title = blockDisplayName(stack.block);
     } else {
       img.style.visibility = 'hidden';
       count.textContent = '';
@@ -140,7 +149,10 @@ export class InventoryScreen {
     });
     this.drawStack(this.heldElement, this.inventory.held);
     this.heldElement.classList.toggle('is-visible', !!this.inventory.held);
-    this.side.classList.toggle('is-visible', this.inventory.creative);
+    // Right-hand side: palette in creative mode, recipes otherwise.
+    this.creativeSide.classList.toggle('is-visible', this.inventory.creative);
+    this.craftingSide.classList.toggle('is-visible', !this.inventory.creative);
+    if (!this.inventory.creative) this.craftingPanel.refresh();
   }
 
   // ---- Clicks ----
@@ -177,9 +189,4 @@ export class InventoryScreen {
       }
     });
   }
-}
-
-function blockName(id) {
-  const name = BLOCK_TYPES[id].name;
-  return name[0].toUpperCase() + name.slice(1);
 }

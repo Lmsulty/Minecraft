@@ -3,7 +3,9 @@
    COLOURS are set in src/theme.js (THEME.ui), not here:
    --inv-backdrop, --inv-panel-bg, --inv-panel-border, --inv-title,
    --inv-slot-bg, --inv-slot-border, --inv-slot-hover,
-   --inv-slot-selected-border, --hotbar-count-shadow, --text
+   --inv-slot-selected-border, --hotbar-count-shadow, --text,
+   --recipe-bg, --recipe-border, --recipe-ready-bg, --recipe-ready-border,
+   --recipe-hover-bg, --recipe-missing-text
    ========================================================== */
 :root {
   --inv-slot-size: 48px;
@@ -13,6 +15,9 @@
   --inv-palette-columns: 4;
   --inv-radius: 6px;
   --inv-font: system-ui, sans-serif;
+  --recipe-width: 230px;
+  --recipe-icon-size: 40px;
+  --recipe-not-ready-opacity: 0.5;  /* how faded recipes you can't craft are */
 }
 
 /* Dims the whole game behind the panel */
@@ -72,7 +77,7 @@
   grid-template-columns: repeat(var(--inv-palette-columns), var(--inv-slot-size));
 }
 
-/* Right-hand panel: only shown in creative mode (for now) */
+/* Right-hand panels: crafting (normal mode) or the block palette (creative) */
 .inv-side {
   display: none;
   padding-left: 24px;
@@ -138,4 +143,66 @@
 
 .inv-held.is-visible {
   display: flex;
+}
+
+/* ---- Crafting list ---- */
+.recipe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: var(--recipe-width);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+/* One recipe card */
+.recipe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--recipe-bg);
+  border: 2px solid var(--recipe-border);
+  border-radius: 4px;
+  opacity: var(--recipe-not-ready-opacity);
+  cursor: default;
+}
+
+/* A recipe you can craft right now */
+.recipe.is-ready {
+  background: var(--recipe-ready-bg);
+  border-color: var(--recipe-ready-border);
+  opacity: 1;
+  cursor: pointer;
+}
+
+.recipe.is-ready:hover {
+  background: var(--recipe-hover-bg);
+}
+
+.recipe-icon {
+  width: var(--recipe-icon-size);
+  height: var(--recipe-icon-size);
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.recipe-name {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.recipe-need {
+  font-size: 12px;
+  white-space: pre; /* keep the double space before the numbers */
+  opacity: 0.85;
+}
+
+/* An ingredient you don't have enough of */
+.recipe-need.is-missing {
+  color: var(--recipe-missing-text);
+  opacity: 1;
 }

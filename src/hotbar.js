@@ -1,5 +1,5 @@
 import './hotbar.css';
-import { BLOCK_TYPES } from './blocks.js';
+import { blockDisplayName } from './blocks.js';
 import { makeBlockIcon } from './blockIcons.js';
 import { HOTBAR_SIZE } from './inventory.js';
 
@@ -111,8 +111,7 @@ export class Hotbar {
 
   showName() {
     const id = this.selectedBlock;
-    const name = id === null ? 'Empty' : BLOCK_TYPES[id].name;
-    this.nameElement.textContent = name[0].toUpperCase() + name.slice(1);
+    this.nameElement.textContent = id === null ? 'Empty' : blockDisplayName(id);
     this.nameElement.classList.add('is-visible');
     clearTimeout(this.nameTimer);
     this.nameTimer = setTimeout(() => this.nameElement.classList.remove('is-visible'), NAME_SHOW_MS);
