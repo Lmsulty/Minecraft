@@ -32,6 +32,7 @@ export class Player {
 
     this.keys = new Set();
     this.locked = false;
+    this.menuOpen = false; // e.g. the inventory screen: mouse is free, but not paused
     this.spawnPoint = { x: 0, y: 0, z: 0 };
 
     this.setupControls();
@@ -49,15 +50,16 @@ export class Player {
   setupControls() {
     // Clicking the overlay captures the mouse (pointer lock).
     this.overlay.addEventListener('click', () => {
-      // The browser may refuse if you click again right after pressing Esc.
-      this.domElement.requestPointerLock()?.catch?.(() => {});
+      this.capture();
     });
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.domElement;
-      this.overlay.style.display = this.locked ? 'none' : 'flex';
-      if (!this.locked) this.keys.clear(); // stop walking when paused
+      this.updateOverlay();
+      if (!this.locked) this.keys.clear(); // stop walking when paused or in a menu
     });
+    // If the browser refuses to capture the mouse, show "Click to play" again.
+    document.addEventListener('pointerlockerror', () => this.updateOverlay());
 
     document.addEventListener('mousemove', (e) => {
       if (!this.locked) return;
@@ -76,6 +78,31 @@ export class Player {
     document.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
     });
+  }
+
+  // Capture the mouse so moving it looks around.
+  capture() {
+    // The browser may refuse if you ask again right after pressing Esc.
+    this.domElement.requestPointerLock()?.catch?.(() => this.updateOverlay());
+  }
+
+  // The "Click to play" screen shows when the mouse is free and no menu is open.
+  updateOverlay() {
+    this.overlay.style.display = this.locked || this.menuOpen ? 'none' : 'flex';
+  }
+
+  // A menu (like the inventory) is opening: free the mouse, but don't pause.
+  openMenu() {
+    this.menuOpen = true;
+    document.exitPointerLock();
+  }
+
+  // The menu closed. resume = true: capture the mouse and keep playing.
+  // resume = false: show the pause screen instead.
+  closeMenu({ resume }) {
+    this.menuOpen = false;
+    if (resume) this.capture();
+    else this.updateOverlay();
   }
 
   // ---- Every frame ----

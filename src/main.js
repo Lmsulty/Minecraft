@@ -9,6 +9,7 @@ import { EditStore } from './storage.js';
 import { Hotbar } from './hotbar.js';
 import { Inventory } from './inventory.js';
 import { CreativeToggle } from './creative.js';
+import { InventoryScreen } from './inventoryScreen.js';
 import { applyUiTheme } from './theme.js';
 import { DayNight } from './dayNight.js';
 
@@ -96,7 +97,12 @@ const hotbar = new Hotbar(document.getElementById('hotbar'), inventory, () => pl
 const interaction = new Interaction(camera, world, player, scene, hotbar, inventory);
 
 // ---- Creative mode: press C for unlimited blocks ----
-new CreativeToggle(document.getElementById('creative-badge'), inventory, () => player.locked);
+// ---- Inventory screen: press E or Tab ----
+const inventoryScreen = new InventoryScreen(document.getElementById('inventory'), inventory, player);
+
+// ---- Creative mode: press C for unlimited blocks (works in the inventory screen too) ----
+new CreativeToggle(document.getElementById('creative-badge'), inventory,
+  () => player.locked || inventoryScreen.isOpen);
 
 // ---- Performance readout in the top-left corner ----
 const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight, player);

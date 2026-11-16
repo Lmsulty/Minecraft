@@ -1,0 +1,141 @@
+/* ==========================================================
+   Inventory screen styling: shapes and sizes.
+   COLOURS are set in src/theme.js (THEME.ui), not here:
+   --inv-backdrop, --inv-panel-bg, --inv-panel-border, --inv-title,
+   --inv-slot-bg, --inv-slot-border, --inv-slot-hover,
+   --inv-slot-selected-border, --hotbar-count-shadow, --text
+   ========================================================== */
+:root {
+  --inv-slot-size: 48px;
+  --inv-icon-size: 36px;
+  --inv-gap: 4px;
+  --inv-columns: 9;
+  --inv-palette-columns: 4;
+  --inv-radius: 6px;
+  --inv-font: system-ui, sans-serif;
+}
+
+/* Dims the whole game behind the panel */
+.inv-screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--inv-backdrop);
+  font-family: var(--inv-font);
+  color: var(--text);
+  user-select: none;
+  z-index: 10;
+}
+
+.inv-screen.is-open {
+  display: flex;
+}
+
+/* The box holding everything */
+.inv-panel {
+  display: flex;
+  gap: 24px;
+  padding: 16px 20px 20px;
+  background: var(--inv-panel-bg);
+  border: 2px solid var(--inv-panel-border);
+  border-radius: var(--inv-radius);
+}
+
+.inv-title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  color: var(--inv-title);
+}
+
+.inv-label {
+  margin: 14px 0 6px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.inv-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+/* Rows of slots */
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--inv-columns), var(--inv-slot-size));
+  gap: var(--inv-gap);
+}
+
+.inv-palette {
+  grid-template-columns: repeat(var(--inv-palette-columns), var(--inv-slot-size));
+}
+
+/* Right-hand panel: only shown in creative mode (for now) */
+.inv-side {
+  display: none;
+  padding-left: 24px;
+  border-left: 1px solid var(--inv-panel-border);
+}
+
+.inv-side.is-visible {
+  display: block;
+}
+
+/* One slot */
+.inv-slot {
+  position: relative;
+  width: var(--inv-slot-size);
+  height: var(--inv-slot-size);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--inv-slot-bg);
+  border: 2px solid var(--inv-slot-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.inv-slot:hover {
+  background: var(--inv-slot-hover);
+}
+
+/* The hotbar slot currently in your hand */
+.inv-slot.is-selected {
+  border-color: var(--inv-slot-selected-border);
+}
+
+.inv-icon {
+  width: var(--inv-icon-size);
+  height: var(--inv-icon-size);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.inv-count {
+  position: absolute;
+  right: 4px;
+  bottom: 1px;
+  font-size: 13px;
+  font-weight: bold;
+  text-shadow: var(--hotbar-count-shadow);
+  pointer-events: none;
+}
+
+/* The stack following the mouse pointer */
+.inv-held {
+  position: fixed;
+  width: var(--inv-slot-size);
+  height: var(--inv-slot-size);
+  transform: translate(-50%, -50%);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.inv-held.is-visible {
+  display: flex;
+}

@@ -155,6 +155,15 @@ export const THEME = {
 
     '--creative-badge-bg': 'rgba(240, 180, 40, 0.9)', // "CREATIVE" label at the top of the screen
     '--creative-badge-text': '#2a1c00',
+
+    '--inv-backdrop': 'rgba(0, 0, 0, 0.45)',      // dims the game behind the inventory
+    '--inv-panel-bg': 'rgba(24, 26, 32, 0.92)',
+    '--inv-panel-border': 'rgba(255, 255, 255, 0.25)',
+    '--inv-title': '#ffffff',
+    '--inv-slot-bg': 'rgba(255, 255, 255, 0.06)',
+    '--inv-slot-border': 'rgba(255, 255, 255, 0.18)',
+    '--inv-slot-hover': 'rgba(255, 255, 255, 0.16)',
+    '--inv-slot-selected-border': '#ffffff',      // the hotbar slot in your hand
   },
 };
 

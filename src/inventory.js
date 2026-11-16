@@ -2,10 +2,13 @@ import { BLOCK_TYPES } from './blocks.js';
 
 // Everything the player is carrying. This file only holds the DATA
 // (which block is in which slot, and how many). Drawing it on screen is
-// done by hotbar.js (and later the inventory screen).
+// done by hotbar.js and inventoryScreen.js.
 //
-// Slots 0-8 are the hotbar. Slots 9-35 are the backpack (shown later on the
+// Slots 0-8 are the hotbar. Slots 9-35 are the backpack (shown on the
 // inventory screen). Each slot is either null (empty) or { block, count }.
+//
+// `held` is the stack stuck to your mouse pointer while you move things
+// around on the inventory screen (null = nothing held).
 //
 // Saved to localStorage, like world edits, so it survives a refresh.
 
@@ -22,6 +25,7 @@ export class Inventory {
     this.storageKey = `voxelgame.inventory.seed${seed}.v1`;
     this.onSaved = onSaved;
     this.slots = new Array(INVENTORY_SIZE).fill(null);
+    this.held = null;        // stack on the mouse pointer (inventory screen only)
     this.selected = 0;       // which hotbar slot is in your hand (0-8)
     this.creative = false;   // creative mode: unlimited blocks (see creative.js)
     this.listeners = [];
@@ -70,24 +74,7 @@ export class Inventory {
   // block, then using the first empty slot (hotbar first, then backpack).
   // Returns how many actually fitted (less than `count` if it's full).
   add(blockId, count = 1) {
-    let left = count;
-    // 1. Top up stacks that already hold this block.
-    for (let i = 0; i < INVENTORY_SIZE && left > 0; i++) {
-      const stack = this.slots[i];
-      if (stack && stack.block === blockId && stack.count < MAX_STACK) {
-        const moved = Math.min(left, MAX_STACK - stack.count);
-        stack.count += moved;
-        left -= moved;
-      }
-    }
-    // 2. Start new stacks in empty slots.
-    for (let i = 0; i < INVENTORY_SIZE && left > 0; i++) {
-      if (this.slots[i] === null) {
-        const moved = Math.min(left, MAX_STACK);
-        this.slots[i] = { block: blockId, count: moved };
-        left -= moved;
-      }
-    }
+    const left = this.fillRange(blockId, count, 0, INVENTORY_SIZE);
     const added = count - left;
     if (added > 0) this.changed();
     return added;
@@ -103,6 +90,117 @@ export class Inventory {
     if (stack.count === 0) this.slots[index] = null;
     this.changed();
     return taken;
+  }
+
+  // ---- Moving stacks around (used by the inventory screen) ----
+
+  // Click a slot with the LEFT button:
+  //   holding nothing      -> pick up the whole stack
+  //   slot empty           -> put the held stack down
+  //   same block           -> add as much as fits; the rest stays held
+  //   different block      -> swap them
+  leftClick(index) {
+    const slot = this.slots[index];
+    const held = this.held;
+    if (!held && !slot) return;
+    if (!held) {
+      this.held = slot;
+      this.slots[index] = null;
+    } else if (!slot) {
+      this.slots[index] = held;
+      this.held = null;
+    } else if (slot.block === held.block) {
+      const moved = Math.min(held.count, MAX_STACK - slot.count);
+      slot.count += moved;
+      held.count -= moved;
+      if (held.count === 0) this.held = null;
+    } else {
+      this.slots[index] = held;
+      this.held = slot;
+    }
+    this.changed();
+  }
+
+  // Click a slot with the RIGHT button:
+  //   holding nothing      -> pick up half the stack (the bigger half)
+  //   slot empty/same block-> put down just one
+  //   different block      -> swap them
+  rightClick(index) {
+    const slot = this.slots[index];
+    const held = this.held;
+    if (!held && !slot) return;
+    if (!held) {
+      const half = Math.ceil(slot.count / 2);
+      this.held = { block: slot.block, count: half };
+      slot.count -= half;
+      if (slot.count === 0) this.slots[index] = null;
+    } else if (!slot) {
+      this.slots[index] = { block: held.block, count: 1 };
+      held.count -= 1;
+      if (held.count === 0) this.held = null;
+    } else if (slot.block === held.block) {
+      if (slot.count >= MAX_STACK) return;
+      slot.count += 1;
+      held.count -= 1;
+      if (held.count === 0) this.held = null;
+    } else {
+      this.slots[index] = held;
+      this.held = slot;
+    }
+    this.changed();
+  }
+
+  // Shift-click: send a whole stack across, hotbar -> backpack or backpack -> hotbar.
+  quickMove(index) {
+    const slot = this.slots[index];
+    if (!slot) return;
+    const inHotbar = index < HOTBAR_SIZE;
+    const [from, to] = inHotbar ? [HOTBAR_SIZE, INVENTORY_SIZE] : [0, HOTBAR_SIZE];
+    const left = this.fillRange(slot.block, slot.count, from, to);
+    if (left === slot.count) return; // nowhere to put it
+    slot.count = left;
+    if (left === 0) this.slots[index] = null;
+    this.changed();
+  }
+
+  // Replace whatever is held (creative palette: pick up a fresh stack,
+  // or pass null to throw the held stack away).
+  setHeld(stack) {
+    this.held = stack;
+    this.changed();
+  }
+
+  // Put the held stack back into the inventory (when the screen closes).
+  // If there's no room, whatever doesn't fit is lost.
+  returnHeld() {
+    if (!this.held) return;
+    const { block, count } = this.held;
+    this.held = null;
+    this.fillRange(block, count, 0, INVENTORY_SIZE);
+    this.changed();
+  }
+
+  // Put `count` of a block into slots from..to-1: top up matching stacks
+  // first, then use empty slots. Returns how many didn't fit.
+  // (Doesn't announce the change; the caller does.)
+  fillRange(blockId, count, from, to) {
+    let left = count;
+    for (let i = from; i < to && left > 0; i++) {
+      const stack = this.slots[i];
+      if (stack && stack.block === blockId && stack.count < MAX_STACK) {
+        const moved = Math.min(left, MAX_STACK - stack.count);
+        stack.count += moved;
+        left -= moved;
+      }
+    }
+    for (let i = from; i < to && left > 0; i++) {
+      if (this.slots[i] === null) {
+        const moved = Math.min(left, MAX_STACK);
+        this.slots[i] = { block: blockId, count: moved };
+        left -= moved;
+      }
+    }
+    return left;
   }
 
   // ---- Telling other code about changes ----
@@ -132,14 +230,18 @@ export class Inventory {
 
     // Only keep stacks that still make sense (e.g. a block that was removed
     // from blocks.js, or a broken save, is skipped instead of crashing).
+    const isValid = (stack) =>
+      stack && BLOCK_TYPES[stack.block]?.textures &&
+      Number.isInteger(stack.count) && stack.count > 0;
+
     (saved.slots ?? []).forEach((stack, i) => {
-      if (i >= INVENTORY_SIZE || !stack) return;
-      const validBlock = BLOCK_TYPES[stack.block]?.textures;
-      const validCount = Number.isInteger(stack.count) && stack.count > 0;
-      if (validBlock && validCount) {
+      if (i < INVENTORY_SIZE && isValid(stack)) {
         this.slots[i] = { block: stack.block, count: Math.min(stack.count, MAX_STACK) };
       }
     });
+    // A stack that was on the mouse pointer when the page closed goes back in.
+    if (isValid(saved.held)) this.fillRange(saved.held.block, saved.held.count, 0, INVENTORY_SIZE);
+
     if (Number.isInteger(saved.selected) && saved.selected >= 0 && saved.selected < HOTBAR_SIZE) {
       this.selected = saved.selected;
     }
@@ -149,7 +251,7 @@ export class Inventory {
   saveNow() {
     clearTimeout(this.saveTimer);
     if (!this.dirty || this.disabled) return;
-    const data = { slots: this.slots, selected: this.selected, creative: this.creative };
+    const data = { slots: this.slots, held: this.held, selected: this.selected, creative: this.creative };
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(data));
       this.dirty = false;
@@ -164,6 +266,7 @@ export class Inventory {
   clear() {
     clearTimeout(this.saveTimer);
     this.slots.fill(null);
+    this.held = null;
     this.selected = 0;
     this.creative = false;
     this.dirty = false;

@@ -79,3 +79,11 @@ export function makeBlockIcon(blockId) {
 
   return canvas;
 }
+
+// The same icon as a picture URL, for <img> tags. Made once per block and reused,
+// so redrawing the inventory screen doesn't repaint every icon.
+const iconURLs = new Map();
+export function getBlockIconURL(blockId) {
+  if (!iconURLs.has(blockId)) iconURLs.set(blockId, makeBlockIcon(blockId).toDataURL());
+  return iconURLs.get(blockId);
+}
