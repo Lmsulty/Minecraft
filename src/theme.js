@@ -7,6 +7,9 @@
 // ==========================================================
 
 export const THEME = {
+  // Which planet you're on. Picks per-planet settings, e.g. blackHole.perPlanet.
+  planet: 'home',
+
   // ---- Sky, haze and light through the day ----
   // The game clock runs 0:00 -> 24:00 (one full day takes about 6 real minutes).
   // Each keyframe is a snapshot of the sky at a certain hour. The game blends
@@ -62,17 +65,30 @@ export const THEME = {
       tilt: 0.12,
     },
   ],
-  // A small black hole, high in the northern sky. Every planet orbits it.
-  // It's visible day and night; at night the stars slowly wheel around it.
+  // The black hole every planet orbits, drawn into the sky in sky.js.
+  // A black centre, a thin blazing ring hugging it, a wide flat glowing disc
+  // seen nearly edge-on, and a soft glow. Stars and sky right around it are
+  // bent outwards, like light passing something extremely heavy.
+  // It sits high in the northern sky; at night the stars wheel around it.
   blackHole: {
-    size: 34,                  // how big it looks
     height: 40,                // degrees above the horizon
-    shadow: '#000000',         // the black middle
-    ringInner: '#fff2d8',      // hottest part of the glowing ring
-    ringOuter: '#ffae62',      // cooler outer edge of the ring
-    glow: '#ff9a4a',           // faint halo around it all
+    discTilt: 8,               // degrees the glowing disc is tipped from flat
+    shadow: '#000000',         // the black centre
+    ringInner: '#fff2d8',      // hottest light, close to the centre
+    ringOuter: '#ff9a4a',      // cooler light at the outer edge of the disc
+    glow: '#ff8c40',           // soft glow spreading into the sky
+    nightBoost: 0.8,           // how much brighter the disc and glow get at night (0 = same as day)
+
+    // How it looks from each planet. The closer the planet, the bigger it looks.
+    //   size:       radius of the black centre, in degrees of sky. The disc
+    //               reaches about 4.5 times further, the glow further still.
+    //   brightness: 1 = normal, higher = more blazing
+    // Later planets get their own line here, e.g. waterWorld: { size: 12, brightness: 1.6 }.
+    perPlanet: {
+      home: { size: 2.6, brightness: 1 }, // the farthest planet: smallest view (about 23 degrees across)
+    },
   },
-  stars: '#ffffff',
+  stars: '#ffffff',          // star colour (stars are drawn into the sky in sky.js)
 
   // ---- Easter egg: curved world (press B in game, see curve.js) ----
   // Draws the world as if you're inside a giant spinning cylinder.

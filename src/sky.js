@@ -1,20 +1,37 @@
 import * as THREE from 'three';
 import { THEME, hexToRgb } from './theme.js';
-import { makeRandom } from './random.js';
 
-// Everything drawn in the sky, made in code: the sky dome (colour fading
-// from the horizon to overhead), the two suns, the black hole and the stars.
-// dayNight.js moves them and sets their colours through the day.
+// Everything drawn in the sky, made in code:
+//  - the sky dome: colour fading from the horizon to overhead, a glow around
+//    the big sun, the stars, and the black hole (with the stars and sky bent
+//    around it)
+//  - the two suns (small pixel-art pictures)
+// dayNight.js moves things and sets their colours through the day.
 
-const STAR_COUNT = 400;
-const STAR_SIZE = 2;        // in screen pixels
 export const SKY_DOME_RADIUS = 400; // must stay inside the camera's view distance (500)
 
+// ---- Stars ----
+// Stars are painted by the sky dome, not as separate dots, so they can be bent
+// around the black hole. The sky is cut into a 3D grid of little boxes; a few
+// boxes (chosen by a fixed random number) hold one star each.
+const STAR_GRID = 60;        // more = smaller boxes = more stars
+const STAR_CHANCE = 0.012;   // share of boxes with a star in them
+const STAR_RADIUS = 0.0022;  // how big each star is (an angle; about 1-2 pixels)
+
+// ---- Black hole shape (sizes are in "centre radii": 1 = edge of the black centre) ----
+const LENS_STRENGTH = 3.0;   // how strongly light is bent around it (bigger = stronger warp)
+const LENS_REACH = 14;       // the warp fades out by this distance
+const DISC_INNER = 1.5;      // where the flat disc starts
+const DISC_OUTER = 4.5;      // where it ends
+const DISC_FLATNESS = 0.18;  // how edge-on we see the disc (smaller = flatter)
+
+const holeView = THEME.blackHole.perPlanet[THEME.planet];
+if (!holeView) throw new Error(`theme.js: no blackHole.perPlanet entry for planet "${THEME.planet}"`);
+
 // ---- Sky dome ----
-// A huge ball around the player, seen from inside. Its colour fades from
-// the horizon colour (the same as the distance haze, so far land blends in)
-// to the overhead colour, with a warm glow around the big sun.
+// A huge ball around the player, seen from inside.
 export function makeSkyDome() {
+  const B = THEME.blackHole;
   const material = new THREE.ShaderMaterial({
     uniforms: {
       horizon: { value: new THREE.Color() },
@@ -22,6 +39,20 @@ export function makeSkyDome() {
       sunDirection: { value: new THREE.Vector3(0, 1, 0) },
       sunGlow: { value: new THREE.Color() },
       sunGlowStrength: { value: 0 },
+      starColor: { value: new THREE.Color(THEME.stars) },
+      starsVisible: { value: 0 },  // 0 by day, 1 at night
+      starTurn: { value: 0 },      // how far the stars have turned around the black hole
+      // The black hole: which way it is, plus "right" and "up" across it.
+      holeDirection: { value: new THREE.Vector3(0, 1, 0) },
+      holeRight: { value: new THREE.Vector3(1, 0, 0) },
+      holeUp: { value: new THREE.Vector3(0, 0, -1) },
+      holeSize: { value: THREE.MathUtils.degToRad(holeView.size) },
+      holeBrightness: { value: holeView.brightness },
+      holeShadow: { value: new THREE.Color(B.shadow) },
+      ringInner: { value: new THREE.Color(B.ringInner) },
+      ringOuter: { value: new THREE.Color(B.ringOuter) },
+      holeGlow: { value: new THREE.Color(B.glow) },
+      discTilt: { value: THREE.MathUtils.degToRad(B.discTilt) },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDirection;
@@ -36,17 +67,126 @@ export function makeSkyDome() {
       uniform vec3 sunDirection;
       uniform vec3 sunGlow;
       uniform float sunGlowStrength;
+      uniform vec3 starColor;
+      uniform float starsVisible;
+      uniform float starTurn;
+      uniform vec3 holeDirection;
+      uniform vec3 holeRight;
+      uniform vec3 holeUp;
+      uniform float holeSize;
+      uniform float holeBrightness;
+      uniform vec3 holeShadow;
+      uniform vec3 ringInner;
+      uniform vec3 ringOuter;
+      uniform vec3 holeGlow;
+      uniform float discTilt;
       varying vec3 vDirection;
+
+      // Three random numbers (0..1) from a position. Same input, same output.
+      vec3 hash3(vec3 p) {
+        p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+        p += dot(p, p.yxz + 33.33);
+        return fract((p.xxy + p.yxx) * p.zyx);
+      }
+
+      // Brightness of any star in this direction (0 = none).
+      float stars(vec3 direction) {
+        vec3 p = direction * ${STAR_GRID.toFixed(1)};
+        vec3 box = floor(p);
+        vec3 roll = hash3(box);
+        if (roll.x > ${STAR_CHANCE}) return 0.0;
+        // The star sits somewhere in the middle of its box.
+        vec3 star = normalize(box + 0.25 + 0.5 * hash3(box + 17.0));
+        float distance = length(direction - star);
+        return (1.0 - smoothstep(0.0, ${STAR_RADIUS}, distance)) * (0.4 + 0.6 * roll.y);
+      }
+
+      // Turn vector v around axis by angle (keeps the axis itself still).
+      vec3 turnAround(vec3 v, vec3 axis, float angle) {
+        return v * cos(angle) + cross(axis, v) * sin(angle) + axis * dot(axis, v) * (1.0 - cos(angle));
+      }
+
       void main() {
         vec3 direction = normalize(vDirection);
-        // 0 at (and below) the horizon, 1 from about 37 degrees up.
-        float up = clamp(direction.y / 0.6, 0.0, 1.0);
-        // The power keeps the sky near the horizon close to the haze colour,
-        // so hills in the distance never stand out against it.
+
+        // ---- Where we are relative to the black hole ----
+        // q = position across the black hole, measured in black-centre radii.
+        float facing = dot(direction, holeDirection);
+        vec2 q = vec2(dot(direction, holeRight), dot(direction, holeUp)) / holeSize;
+        float r = length(q);
+        bool nearHole = facing > 0.0 && r < ${(LENS_REACH + 4).toFixed(1)};
+
+        // ---- Bent light ----
+        // Light passing close to the black hole is bent, so the sky we see
+        // there really comes from further out: stars get pushed outwards and
+        // stretched into arcs. The bend fades away with distance.
+        vec3 skyDirection = direction;
+        if (nearHole) {
+          float fade = 1.0 - smoothstep(${(LENS_REACH * 0.5).toFixed(1)}, ${LENS_REACH.toFixed(1)}, r);
+          vec2 source = q * (1.0 - ${LENS_STRENGTH.toFixed(2)} / max(r * r, 0.0001));
+          source = mix(q, source, fade);
+          skyDirection = normalize(holeDirection * facing + (holeRight * source.x + holeUp * source.y) * holeSize);
+        }
+
+        // ---- Sky colour ----
+        // 0 at (and below) the horizon, 1 from about 37 degrees up. The power keeps
+        // the sky near the horizon close to the haze colour, so far hills blend in.
+        float up = clamp(skyDirection.y / 0.6, 0.0, 1.0);
         vec3 color = mix(horizon, top, pow(up, 1.5));
         // Warm glow around the sun, strongest low in the sky.
         float towardSun = pow(max(dot(direction, sunDirection), 0.0), 6.0);
         color = mix(color, sunGlow, towardSun * sunGlowStrength * (1.0 - up * 0.6));
+
+        // ---- Stars (turning slowly around the black hole) ----
+        if (starsVisible > 0.0) {
+          vec3 starDirection = turnAround(skyDirection, holeDirection, starTurn);
+          color += starColor * stars(starDirection) * starsVisible;
+        }
+
+        // ---- The black hole ----
+        if (nearHole) {
+          // Brighter at night.
+          float power = holeBrightness * (1.0 + ${THEME.blackHole.nightBoost.toFixed(2)} * starsVisible);
+
+          // Soft glow spreading into the sky.
+          // It fades to nothing well before the edge of the area we draw in.
+          float glow = (0.45 * exp(-(r - 1.0) / 1.8) + 0.12 * exp(-r / 4.0))
+                     * (1.0 - smoothstep(${(LENS_REACH * 0.6).toFixed(1)}, ${(LENS_REACH + 3).toFixed(1)}, r));
+          color += holeGlow * glow * power * mix(0.6, 1.0, starsVisible);
+
+          // The flat disc, tipped a little, seen nearly edge-on.
+          vec2 d = vec2(q.x * cos(discTilt) + q.y * sin(discTilt), -q.x * sin(discTilt) + q.y * cos(discTilt));
+          float discDistance = length(vec2(d.x, d.y / ${DISC_FLATNESS}));
+          float disc = smoothstep(${DISC_INNER.toFixed(1)}, ${(DISC_INNER + 0.3).toFixed(1)}, discDistance)
+                     * (1.0 - smoothstep(${(DISC_OUTER - 1.5).toFixed(1)}, ${DISC_OUTER.toFixed(1)}, discDistance));
+          // Hotter and brighter towards the middle; one side brighter as it
+          // spins towards us.
+          vec3 discColor = mix(ringInner, ringOuter, smoothstep(${DISC_INNER.toFixed(1)}, ${DISC_OUTER.toFixed(1)}, discDistance));
+          float discLight = pow(${DISC_INNER.toFixed(1)} / discDistance, 0.8) * (1.0 - 0.45 * d.x / max(discDistance, 0.001));
+          discColor *= discLight * power;
+
+          // The far side of the disc, bent up over the top of the black
+          // centre and down under it, as arcs hugging it.
+          float arc = smoothstep(1.08, 1.2, r) * (1.0 - smoothstep(1.5, 1.95, r));
+          float overOrUnder = smoothstep(0.25, 0.85, abs(d.y) / max(r, 0.001));
+          arc *= overOrUnder * (d.y > 0.0 ? 1.0 : 0.6);
+          color = mix(color, mix(ringInner, ringOuter, 0.35) * power, clamp(arc, 0.0, 1.0));
+
+          // Back half of the disc (above the middle line) goes behind the centre...
+          if (d.y > 0.0) color = mix(color, discColor, disc);
+
+          // ...the black centre...
+          float shadow = 1.0 - smoothstep(0.96, 1.0, r);
+          color = mix(color, holeShadow, shadow);
+
+          // ...a thin ring of light hugging it...
+          float ring = exp(-pow((r - 1.04) / 0.045, 2.0));
+          color += ringInner * ring * 1.4 * power;
+
+          // ...and the front half of the disc crosses in front of it.
+          if (d.y <= 0.0) color = mix(color, discColor, disc);
+        }
+
         gl_FragColor = vec4(color, 1.0);
         #include <colorspace_fragment>
       }
@@ -56,12 +196,15 @@ export function makeSkyDome() {
     fog: false,
   });
   const dome = new THREE.Mesh(new THREE.SphereGeometry(SKY_DOME_RADIUS, 32, 16), material);
-  dome.renderOrder = -2;      // drawn first, behind everything
+  // Drawn AFTER the land (but before see-through things like the suns): any
+  // pixel already covered by land is skipped, so the sky's maths only runs
+  // where you can actually see sky.
+  dome.renderOrder = 1;
   dome.frustumCulled = false; // always around you
   return dome;
 }
 
-// ---- Pixel-art sky pictures ----
+// ---- The suns (pixel art) ----
 
 // Paints a 32 x 32 pixel image using draw(x, y, distanceFromCentre) -> [r, g, b, alpha] or null.
 function paintSkyTexture(draw) {
@@ -95,11 +238,6 @@ function glow(color, distance, from, to, strength) {
   return [...color, Math.round(255 * strength * stepped * stepped)];
 }
 
-// Blend two [r, g, b] colours: t = 0 gives a, t = 1 gives b.
-function mixRgb(a, b, t) {
-  return a.map((v, i) => Math.round(v + (b[i] - v) * t));
-}
-
 // A sun from THEME.suns: bright core, coloured rim, soft halo.
 function sunPainter(sun) {
   const core = hexToRgb(sun.core);
@@ -110,31 +248,6 @@ function sunPainter(sun) {
     if (d <= 8) return [...rim, 255];
     return glow(halo, d, 8, 15.5, 0.6);
   };
-}
-
-// The black hole: a pure black middle, a thin blazing ring hugging it, and a
-// flat glowing disc seen almost edge-on. The near half of the disc passes in
-// front of the black middle; the far half is hidden behind it. One side of
-// the disc is brighter than the other (it's spinning towards us there).
-function drawBlackHole(x, y, d) {
-  const B = THEME.blackHole;
-  const inner = hexToRgb(B.ringInner);
-  const outer = hexToRgb(B.ringOuter);
-  const dx = x - 15.5;
-  const dy = y - 15.5;
-
-  const discDistance = Math.hypot(dx, dy * 3.2); // squashed: a flat disc tipped towards us
-  const inDisc = discDistance >= 7 && discDistance <= 14.5;
-  const inFront = dy > 0; // lower half of the picture = near side of the disc
-  if (inDisc && (inFront || d > 5.5)) {
-    const color = mixRgb(inner, outer, (discDistance - 7) / 7.5);
-    const brightness = 0.7 + 0.3 * (-dx / 14.5); // brighter on the left
-    return [...color.map((v) => Math.min(255, Math.round(v * brightness))), 255];
-  }
-  if (d <= 5) return [...hexToRgb(B.shadow), 255];
-  if (d <= 6.3) return [...inner, 255];         // blazing ring right at the edge
-  if (d <= 7.5) return [...outer, 170];
-  return glow(hexToRgb(B.glow), d, 7.5, 15.5, 0.35);
 }
 
 function makeSkySprite(draw, size) {
@@ -151,42 +264,4 @@ function makeSkySprite(draw, size) {
 
 export function makeSuns() {
   return THEME.suns.map((sun) => makeSkySprite(sunPainter(sun), sun.size));
-}
-
-export function makeBlackHole() {
-  return makeSkySprite(drawBlackHole, THEME.blackHole.size);
-}
-
-// ---- Stars ----
-export function makeStars(distance) {
-  const rand = makeRandom(4242); // same sky every time
-  const positions = [];
-  const colors = [];
-  const base = new THREE.Color(THEME.stars);
-  for (let i = 0; i < STAR_COUNT; i++) {
-    // A random point on a big sphere around the player.
-    const around = rand() * Math.PI * 2;
-    const up = Math.asin(rand() * 2 - 1);
-    positions.push(
-      Math.cos(up) * Math.cos(around) * distance,
-      Math.sin(up) * distance,
-      Math.cos(up) * Math.sin(around) * distance,
-    );
-    const brightness = 0.4 + rand() * 0.6; // some stars dimmer than others
-    colors.push(base.r * brightness, base.g * brightness, base.b * brightness);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const material = new THREE.PointsMaterial({
-    size: STAR_SIZE,
-    sizeAttenuation: false, // same size no matter how far
-    vertexColors: true,
-    fog: false,
-    transparent: true,
-    depthWrite: false,
-  });
-  const stars = new THREE.Points(geometry, material);
-  stars.renderOrder = -1; // behind the suns and black hole
-  return stars;
 }

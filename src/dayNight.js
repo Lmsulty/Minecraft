@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { THEME } from './theme.js';
-import { makeSkyDome, makeSuns, makeBlackHole, makeStars } from './sky.js';
+import { makeSkyDome, makeSuns } from './sky.js';
 
 // Day/night cycle: a game clock, the two suns moving across the sky, the
 // black hole with the stars wheeling around it at night, and the sky, haze
@@ -17,8 +17,6 @@ const SUNSET_HOUR = 20;         // sun crosses the horizon going down
 // ---- Sky objects ----
 const SUN_TILT = 0.35;      // tilts the suns' path a little toward the south, so walls get different shading
 const SKY_DISTANCE = 200;   // how far away the suns are drawn (always this far from you)
-const BLACK_HOLE_DISTANCE = 220; // a little further than the suns, so they pass in front of it
-const STAR_DISTANCE = 250;
 const STAR_TURN_SPEED = 0.5; // how fast the stars wheel around the black hole (turns per day)
 
 // Eases a 0..1 value so changes start and end gently instead of abruptly.
@@ -51,18 +49,18 @@ export class DayNight {
     this.sunDirection = new THREE.Vector3(); // the big sun: where the light comes from
     this.direction = new THREE.Vector3();    // scratch space for the other sun
 
+    // The sky dome draws the sky colours, the stars and the black hole (sky.js).
     this.dome = makeSkyDome();
     this.suns = makeSuns();
-    // The black hole sits still at the "pole" of the night sky, and the
-    // stars turn around it. `pole` points at the black hole: its own z axis
-    // is tipped up to THEME.blackHole.height degrees above the northern horizon.
-    this.pole = new THREE.Group();
-    this.pole.rotation.x = Math.PI + THREE.MathUtils.degToRad(THEME.blackHole.height);
-    this.blackHole = makeBlackHole();
-    this.blackHole.position.set(0, 0, BLACK_HOLE_DISTANCE);
-    this.stars = makeStars(STAR_DISTANCE);
-    this.pole.add(this.stars, this.blackHole);
-    scene.add(this.dome, this.pole, ...this.suns);
+    scene.add(this.dome, ...this.suns);
+
+    // The black hole stays still, high in the northern sky (north = -z).
+    // Also work out "up" and "right" across it, for drawing its disc.
+    const height = THREE.MathUtils.degToRad(THEME.blackHole.height);
+    const dome = this.dome.material.uniforms;
+    dome.holeDirection.value.set(0, Math.sin(height), -Math.cos(height));
+    dome.holeUp.value.set(0, Math.cos(height), Math.sin(height));
+    dome.holeRight.value.crossVectors(dome.holeDirection.value, dome.holeUp.value);
 
     document.addEventListener('keydown', (e) => {
       if (e.code === 'KeyT' && !e.repeat) this.fast = !this.fast;
@@ -109,7 +107,7 @@ export class DayNight {
     this.ambientLight.intensity = a.ambientStrength + (b.ambientStrength - a.ambientStrength) * t;
     this.mainLight.color.lerpColors(a.light, b.light, t);
     this.lightStrength = a.lightStrength + (b.lightStrength - a.lightStrength) * t;
-    this.stars.material.opacity = a.stars + (b.stars - a.stars) * t;
+    dome.starsVisible.value = a.stars + (b.stars - a.stars) * t;
   }
 
   // ---- Where the suns, black hole and stars are ----
@@ -152,11 +150,9 @@ export class DayNight {
     dome.sunGlow.value.copy(this.mainLight.color);
     dome.sunGlowStrength.value = smooth((sunHeight + 0.25) / 0.25) * (1 - 0.6 * smooth(sunHeight / 0.5));
 
-    // The dome, black hole and stars follow you; the stars turn slowly
-    // around the black hole.
+    // The dome follows you; the stars turn slowly around the black hole.
     this.dome.position.copy(cam);
-    this.pole.position.copy(cam);
-    this.stars.rotation.z = (this.hour / 24) * Math.PI * 2 * STAR_TURN_SPEED;
+    dome.starTurn.value = (this.hour / 24) * Math.PI * 2 * STAR_TURN_SPEED;
   }
 
   // e.g. "14:30" or "14:30 (x20)"
