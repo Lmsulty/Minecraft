@@ -5,6 +5,7 @@ import { bendMaterial, unbendPoint } from './curve.js';
 
 // Breaking and placing blocks: finds the block under the crosshair,
 // draws an outline around it, and handles mouse clicks.
+// Left click also hits creatures (mobs.js), if one is closer than the block.
 // Which block gets placed comes from the hotbar (hotbar.js).
 // Broken blocks go into the inventory; placing a block uses one up.
 
@@ -13,10 +14,12 @@ const REACH = 5; // how far away (in blocks) you can break/place
 // The line of sight is checked in small steps. Smaller = more exact but slower.
 const RAY_STEP = 0.05;   // blocks between checks
 const REFINE_STEPS = 12; // extra checks to find exactly where the ray enters a block
+const MOB_STEP = 0.1;    // blocks between checks when looking for a creature
 
 export class Interaction {
-  constructor(camera, world, player, scene, hotbar, inventory) {
+  constructor(camera, world, player, scene, hotbar, inventory, mobs) {
     this.camera = camera;
+    this.mobs = mobs;
     this.world = world;
     this.player = player;
     this.hotbar = hotbar;
@@ -52,6 +55,12 @@ export class Interaction {
 
   breakBlock() {
     const hit = this.raycast();
+    // A creature in the way, closer than the block (or with no block in reach)?
+    const mob = this.mobInSight(hit ? hit.t : REACH);
+    if (mob) {
+      this.mobs.hit(mob, this.player.position);
+      return;
+    }
     if (!hit) return;
     const blockId = this.world.getBlock(hit.x, hit.y, hit.z);
     if (!isBreakableId(blockId)) return; // e.g. the core rock floor
@@ -118,7 +127,21 @@ export class Interaction {
         if (this.world.isSolid(c.x, c.y, c.z)) { solid = c; hi = mid; }
         else { air = c; lo = mid; }
       }
-      return { ...solid, ...faceBetween(air, solid) };
+      return { ...solid, ...faceBetween(air, solid), t: hi }; // t = how far away it is
+    }
+    return null;
+  }
+
+  // The first creature along the line of sight, up to `maxT` blocks away, or
+  // null. Walks along the drawn line and turns each point back into the flat
+  // world, like raycast(), so it also works in the curved view.
+  mobInSight(maxT) {
+    const origin = this.camera.position;
+    const dir = this.camera.getWorldDirection(this.direction);
+    for (let t = MOB_STEP; t <= maxT; t += MOB_STEP) {
+      this.drawnPoint.copy(origin).addScaledVector(dir, t);
+      const mob = this.mobs.mobAt(unbendPoint(this.drawnPoint, origin.x, this.flatPoint));
+      if (mob) return mob;
     }
     return null;
   }

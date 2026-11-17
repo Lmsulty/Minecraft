@@ -156,7 +156,12 @@ export function bendMaterial(material) {
     shader.uniforms.uCurveTable = uniforms.uCurveTable;
     shader.vertexShader = BEND_GLSL + shader.vertexShader
       .replace('#include <project_vertex>', /* glsl */ `
-        vec4 flatWorld = modelMatrix * vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          // Many copies of one shape in one draw (e.g. mobs): each copy has its own position.
+          vec4 flatWorld = modelMatrix * instanceMatrix * vec4(transformed, 1.0);
+        #else
+          vec4 flatWorld = modelMatrix * vec4(transformed, 1.0);
+        #endif
         vec4 bentWorld = vec4(bendPoint(flatWorld.xyz), 1.0);
         vec4 mvPosition = viewMatrix * bentWorld;
         gl_Position = projectionMatrix * mvPosition;

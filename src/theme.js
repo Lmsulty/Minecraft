@@ -76,10 +76,12 @@ export const THEME = {
     //   clouds:        'full' or 'simple' (same shapes, simpler lighting)
     //   blackHole:     'full' or 'simple' (smoother, less churning gas)
     //   antialias:     smooth jagged edges. Only changes when the page is reloaded.
+    //   mobScale:      how many creatures can be around at once, times each
+    //                  creature's own limit in mobTypes.js (1 = the full amount)
     levels: {
-      high:   { pixelRatio: 2,   drawRadius: 5, haze: [45, 78], chunkBudgetMs: 4, starLayers: 2, galaxy: 'full',   clouds: 'full',   blackHole: 'full',   antialias: true },
-      medium: { pixelRatio: 1.5, drawRadius: 4, haze: [36, 62], chunkBudgetMs: 3, starLayers: 2, galaxy: 'simple', clouds: 'full',   blackHole: 'full',   antialias: true },
-      low:    { pixelRatio: 1,   drawRadius: 3, haze: [27, 46], chunkBudgetMs: 2, starLayers: 1, galaxy: 'simple', clouds: 'simple', blackHole: 'simple', antialias: false },
+      high:   { pixelRatio: 2,   drawRadius: 5, haze: [45, 78], chunkBudgetMs: 4, starLayers: 2, galaxy: 'full',   clouds: 'full',   blackHole: 'full',   antialias: true,  mobScale: 1 },
+      medium: { pixelRatio: 1.5, drawRadius: 4, haze: [36, 62], chunkBudgetMs: 3, starLayers: 2, galaxy: 'simple', clouds: 'full',   blackHole: 'full',   antialias: true,  mobScale: 0.75 },
+      low:    { pixelRatio: 1,   drawRadius: 3, haze: [27, 46], chunkBudgetMs: 2, starLayers: 1, galaxy: 'simple', clouds: 'simple', blackHole: 'simple', antialias: false, mobScale: 0.5 },
     },
   },
 
@@ -178,6 +180,23 @@ export const THEME = {
     curveRadius: 75,      // how tight the full-strength curve is (smaller = more dramatic)
     curveGroundLevel: 48, // the height that sits exactly on the curved ground line
                           // (average ground level, see BASE_HEIGHT in terrain.js)
+  },
+
+  // ---- Creatures (shapes and behaviour in mobTypes.js, logic in mobs.js) ----
+  // Each creature's parts use these colour names (see `color:` in mobTypes.js).
+  mobs: {
+    hitFlash: '#fff4ea',     // colour a creature flashes when you hit it (pale, so it shows on any colour)
+    underCover: 0.45,        // how dark creatures look with no open sky above (1 = not darker)
+    grazer: {                // chunky six-legged herbivore of the golden meadows
+      body: '#b5562b',       // rusty orange
+      belly: '#d98a52',
+      plates: '#2f7a6a',     // teal plates along its back
+      legs: '#6e3320',
+      head: '#a24a24',
+      snout: '#c97a4e',
+      stalks: '#6e3320',     // the stalks its eyes sit on
+      eyes: '#141018',
+    },
   },
 
   // ---- In the world ----

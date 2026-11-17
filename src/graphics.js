@@ -4,7 +4,7 @@ import { THEME } from './theme.js';
 //
 // What each level does is set in theme.js (THEME.graphics.levels). This file:
 //  - remembers the player's choice in the browser (localStorage)
-//  - applies a level: sharpness, draw distance, haze, and sky detail
+//  - applies a level: sharpness, draw distance, haze, sky detail and how many creatures
 //  - in Auto mode, watches the FPS box's "Slowest" number and steps down a
 //    level if the game keeps stuttering, with a small message. Auto never
 //    steps back up on its own (that would make the picture flicker between
@@ -45,8 +45,8 @@ export class GraphicsSettings {
 
   // Connect to the rest of the game and apply the starting level.
   // The sky was already built with this level's detail, so it's skipped here.
-  attach({ renderer, world, scene, dayNight, player, fps, buttons, notice }) {
-    Object.assign(this, { renderer, world, scene, dayNight, player, notice });
+  attach({ renderer, world, scene, dayNight, player, fps, mobs, buttons, notice }) {
+    Object.assign(this, { renderer, world, scene, dayNight, player, mobs, notice });
     this.apply({ sky: false });
 
     // The FPS box gives us each new "Slowest" reading, and shows our label.
@@ -76,6 +76,7 @@ export class GraphicsSettings {
     this.world.setDrawRadius(level.drawRadius, level.chunkBudgetMs);
     this.scene.fog.near = level.haze[0];
     this.scene.fog.far = level.haze[1];
+    this.mobs.setScale(level.mobScale);
     if (sky) this.dayNight.setSkyDetail(level);
   }
 

@@ -1,0 +1,161 @@
+import * as THREE from 'three';
+import { THEME } from './theme.js';
+import { bendMaterial } from './curve.js';
+import { makeRandom } from './random.js';
+
+// Drawing and animating creatures.
+//
+// Every creature is made of boxes (its `parts` in mobTypes.js). All the boxes
+// of all the creatures of one type are copies of ONE cube, drawn together in
+// a single draw call (an "instanced mesh"): each copy just gets its own
+// position, size, angle and colour. So 16 grazers cost the same number of
+// draw calls as 1.
+//
+// The material is bent like the land (curve.js), so creatures follow the
+// curved view and fade into the haze exactly like the blocks around them.
+
+const FAR_ANIMATION = 40; // creatures further away than this don't move their legs (saves time)
+
+// ---- A soft speckle, so the boxes have a pixel-art look like the blocks ----
+function makeSpeckleTexture() {
+  const size = 8;
+  const random = makeRandom(4242);
+  const data = new Uint8Array(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
+    const v = Math.round(255 * (0.8 + 0.2 * random()));
+    data.set([v, v, v, 255], i * 4);
+  }
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.magFilter = THREE.NearestFilter; // chunky pixels
+  texture.minFilter = THREE.NearestFilter;
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+const CUBE = new THREE.BoxGeometry(1, 1, 1);
+const MATERIAL = bendMaterial(new THREE.MeshLambertMaterial({ map: makeSpeckleTexture() }));
+const FLASH = new THREE.Color(THEME.mobs.hitFlash);
+
+// Scratch space, reused every frame (making new objects every frame would
+// create garbage for the browser to clean up).
+const mobMatrix = new THREE.Matrix4();
+const boneMatrix = new THREE.Matrix4();
+const partMatrix = new THREE.Matrix4();
+const position = new THREE.Vector3();
+const turn = new THREE.Quaternion();
+const scale = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+const pivotPoint = new THREE.Vector3();
+const color = new THREE.Color();
+
+// Rotate around the X axis (nodding forward) by `angle`, about point (px, py, pz).
+function rotateXAbout(out, angle, px, py, pz) {
+  out.makeRotationX(angle);
+  pivotPoint.set(px, py, pz).applyMatrix4(out);
+  return out.setPosition(px - pivotPoint.x, py - pivotPoint.y, pz - pivotPoint.z);
+}
+
+// Draws every creature of one type.
+export class MobRenderer {
+  constructor(type, maxMobs, scene) {
+    this.type = type;
+    this.parts = type.parts;
+
+    // The colours of each part, from THEME.mobs (stops with a clear message on a typo).
+    const palette = THEME.mobs[type.colors];
+    if (!palette) throw new Error(`theme.js: no THEME.mobs.${type.colors} colours for ${type.name}`);
+    this.colors = this.parts.map((part) => {
+      if (!palette[part.color]) throw new Error(`theme.js: THEME.mobs.${type.colors} has no colour "${part.color}"`);
+      return new THREE.Color(palette[part.color]);
+    });
+
+    this.mesh = new THREE.InstancedMesh(CUBE, MATERIAL, maxMobs * this.parts.length);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // changes every frame
+    this.mesh.setColorAt(0, color.set(0xffffff)); // makes the per-copy colour list
+    this.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.count = 0;
+    // Off-screen checks don't work for one mesh spread over many creatures
+    // (and the curve moves things). It's a single draw call anyway.
+    this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  // Update the pose of every creature of this type and send it to the graphics card.
+  draw(mobs, camera) {
+    const parts = this.parts;
+    let i = 0;
+    for (const mob of mobs) {
+      if (mob.type !== this.type) continue;
+      const near = Math.hypot(mob.position.x - camera.position.x, mob.position.z - camera.position.z) < FAR_ANIMATION;
+
+      // Where the whole creature is, which way it faces, and how big (it shrinks away when defeated).
+      const size = mob.dying ? Math.max(0.01, mob.dyingTimer / mob.dyingLength) : 1;
+      position.set(mob.position.x, mob.position.y, mob.position.z);
+      turn.setFromAxisAngle(UP, mob.yaw);
+      mobMatrix.compose(position, turn, scale.set(size, size, size));
+
+      // Animation: legs swing in two groups, the body bobs, the head dips to graze.
+      const swing = near ? Math.sin(mob.walkPhase) * this.type.legSwing * mob.moving : 0;
+      const bob = near ? Math.abs(Math.sin(mob.walkPhase)) * 0.05 * mob.moving : 0;
+
+      for (let p = 0; p < parts.length; p++) {
+        const part = parts[p];
+        const [w, h, d] = part.size;
+        const [x, y, z] = part.at;
+        partMatrix.makeScale(w, h, d).setPosition(x, y, z);
+        if (part.bone === 'leg') {
+          // Swing from the hip (top of the leg). Group 1 swings the opposite way.
+          rotateXAbout(boneMatrix, part.leg === 0 ? swing : -swing, x, y + h / 2, z);
+        } else if (part.bone === 'head') {
+          const [px, py, pz] = this.type.head.pivot;
+          rotateXAbout(boneMatrix, mob.headDip, px, py, pz);
+          boneMatrix.elements[13] += bob;
+        } else {
+          boneMatrix.makeTranslation(0, bob, 0);
+        }
+        partMatrix.premultiply(boneMatrix).premultiply(mobMatrix);
+        this.mesh.setMatrixAt(i, partMatrix);
+
+        // Colour: darker under cover, and flashing when hit.
+        color.copy(this.colors[p]).multiplyScalar(mob.shade);
+        if (mob.flash > 0) color.lerp(FLASH, mob.flash);
+        this.mesh.setColorAt(i, color);
+        i++;
+      }
+    }
+    this.mesh.count = i;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+
+// Move the animation along. `moved` = how far the creature walked this frame.
+export function animateMob(mob, dt, moved) {
+  const type = mob.type;
+  // How much it's walking (0..1), eased so the legs don't stop dead.
+  const target = moved > 0.002 ? 1 : 0;
+  mob.moving += (target - mob.moving) * Math.min(1, dt * 8);
+  // Legs step in time with the distance actually walked, so feet don't slide.
+  mob.walkPhase = (mob.walkPhase + (moved / type.stride) * Math.PI * 2) % (Math.PI * 2);
+  // Head down while grazing, with a little chewing nod.
+  mob.chew += dt * 8;
+  const dip = mob.grazing ? type.head.grazeDip + Math.sin(mob.chew) * 0.06 : 0;
+  mob.headDip += (dip - mob.headDip) * Math.min(1, dt * 4);
+  // Fade the hit flash out.
+  mob.flash = Math.max(0, mob.flash - dt * 5);
+}
+
+// The box around a creature's model at rest (in its own space, facing +z),
+// used to check whether a click hit it.
+export function modelBounds(type) {
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (const { size, at } of type.parts) {
+    for (let a = 0; a < 3; a++) {
+      min[a] = Math.min(min[a], at[a] - size[a] / 2);
+      max[a] = Math.max(max[a], at[a] + size[a] / 2);
+    }
+  }
+  return { min, max };
+}

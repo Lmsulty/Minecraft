@@ -14,6 +14,7 @@ import { applyUiTheme } from './theme.js';
 import { DayNight } from './dayNight.js';
 import { updateCurve, cullBentChunks } from './curve.js';
 import { GraphicsSettings } from './graphics.js';
+import { Mobs } from './mobs.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
@@ -98,10 +99,13 @@ function findSpawn(x, z) {
   return { x: x + 0.5, y: world.getSurfaceY(x, z), z: z + 0.5 }; // fallback
 }
 
-// ---- Breaking and placing blocks ----
+// ---- Creatures: spawn near the player, wander, and can be hit (mobs.js) ----
+const mobs = new Mobs(scene, world, player, camera, dayNight);
+
+// ---- Breaking and placing blocks (and hitting creatures) ----
 // The hotbar's scroll wheel only works while playing (mouse captured).
 const hotbar = new Hotbar(document.getElementById('hotbar'), inventory, () => player.locked);
-const interaction = new Interaction(camera, world, player, scene, hotbar, inventory);
+const interaction = new Interaction(camera, world, player, scene, hotbar, inventory, mobs);
 
 // ---- Creative mode: press C for unlimited blocks ----
 // ---- Inventory screen: press E or Tab ----
@@ -112,11 +116,11 @@ new CreativeToggle(document.getElementById('creative-badge'), inventory,
   () => player.locked || inventoryScreen.isOpen);
 
 // ---- Performance readout in the top-left corner ----
-const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight, player);
+const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight, player, mobs);
 
 // ---- Graphics buttons on the pause screen, and Auto mode ----
 graphics.attach({
-  renderer, world, scene, dayNight, player, fps,
+  renderer, world, scene, dayNight, player, fps, mobs,
   buttons: document.getElementById('graphics'),
   notice: document.getElementById('notice'),
 });
@@ -147,6 +151,7 @@ function loop(now) {
 
   world.update(player.position.x, player.position.z); // load/unload chunks, a few ms at most
   player.update(dt);
+  mobs.update(dt);     // after the player moves, so they react to where you are now
   interaction.update();
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera
   updateCurve(camera);                   // the cylinder bend starts at the camera

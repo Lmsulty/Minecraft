@@ -1,5 +1,8 @@
+import { moveBody } from './physics.js';
+
 // First-person player: mouse look, WASD movement, jumping, gravity and
-// collision against solid blocks. Only talks to the world through world.isSolid().
+// collision against solid blocks (the collision rules are in physics.js,
+// shared with mobs).
 
 // ---- Tuning numbers (play with these!) ----
 const WALK_SPEED = 4.5;         // blocks per second
@@ -12,7 +15,6 @@ const MOUSE_SENSITIVITY = 0.002;
 const HALF_WIDTH = 0.3;  // player is 0.6 blocks wide
 const HEIGHT = 1.8;
 const EYE_HEIGHT = 1.62;
-const EPSILON = 0.001;   // tiny gap so we never sit *exactly* on a block edge
 
 export class Player {
   constructor(camera, world, domElement, overlay) {
@@ -25,6 +27,8 @@ export class Player {
     this.position = { x: 0, y: 0, z: 0 };
     this.velocity = { x: 0, y: 0, z: 0 };
     this.onGround = false;
+    this.halfWidth = HALF_WIDTH; // body size, for physics.js
+    this.height = HEIGHT;
 
     this.yaw = 0;   // looking left/right
     this.pitch = 0; // looking up/down
@@ -142,18 +146,8 @@ export class Player {
     }
     this.velocity.y = Math.max(this.velocity.y - GRAVITY * dt, -MAX_FALL_SPEED);
 
-    // Move in small steps so a fast fall can't skip through a block.
-    const dx = this.velocity.x * dt;
-    const dy = this.velocity.y * dt;
-    const dz = this.velocity.z * dt;
-    const steps = Math.ceil(Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) / 0.4) || 1;
-    this.onGround = false;
-    for (let i = 0; i < steps; i++) {
-      // One axis at a time: hitting a wall in X still lets you slide in Z.
-      this.moveAxis('x', dx / steps);
-      this.moveAxis('z', dz / steps);
-      this.moveAxis('y', dy / steps);
-    }
+    // Move, stopping at solid blocks (physics.js).
+    moveBody(this, this.world, this.velocity.x * dt, this.velocity.y * dt, this.velocity.z * dt);
 
     // Fell out of the bottom of the world? Back to the start.
     if (this.position.y < -30) {
@@ -164,49 +158,6 @@ export class Player {
   }
 
   // ---- Collision ----
-
-  moveAxis(axis, amount) {
-    if (amount === 0) return;
-    const p = this.position;
-    p[axis] += amount;
-    if (!this.collides()) return;
-
-    // We moved into a block: push back to just touching its face.
-    if (axis === 'y') {
-      if (amount < 0) {
-        p.y = Math.floor(p.y) + 1; // landed on top of a block
-        this.onGround = true;
-      } else {
-        p.y = Math.floor(p.y + HEIGHT) - HEIGHT - EPSILON; // bumped head
-      }
-      this.velocity.y = 0;
-    } else {
-      if (amount > 0) {
-        p[axis] = Math.floor(p[axis] + HALF_WIDTH) - HALF_WIDTH - EPSILON;
-      } else {
-        p[axis] = Math.floor(p[axis] - HALF_WIDTH) + 1 + HALF_WIDTH + EPSILON;
-      }
-    }
-  }
-
-  // Is any solid block overlapping the player's body box?
-  collides() {
-    const p = this.position;
-    const minX = Math.floor(p.x - HALF_WIDTH);
-    const maxX = Math.floor(p.x + HALF_WIDTH);
-    const minY = Math.floor(p.y);
-    const maxY = Math.floor(p.y + HEIGHT);
-    const minZ = Math.floor(p.z - HALF_WIDTH);
-    const maxZ = Math.floor(p.z + HALF_WIDTH);
-    for (let x = minX; x <= maxX; x++) {
-      for (let y = minY; y <= maxY; y++) {
-        for (let z = minZ; z <= maxZ; z++) {
-          if (this.world.isSolid(x, y, z)) return true;
-        }
-      }
-    }
-    return false;
-  }
 
   // Would a block at (bx, by, bz) overlap the player's body?
   // Used to stop you placing a block inside yourself.
