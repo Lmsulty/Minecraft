@@ -106,52 +106,99 @@ const AO_NEIGHBOURS = FACES.map((face) => {
 });
 
 // Collects faces for one render type, then turns them into a Three.js shape.
+//
+// The numbers are written into fixed-size number arrays that are kept and
+// reused for every chunk (they double in size if a chunk ever needs more).
+// Growing ordinary lists face by face made lots of throwaway memory, and
+// every so often the browser had to stop and clean it up, which made a
+// chunk now and then take 5-10 times longer than usual to build.
+const START_FACES = 4096; // room for this many faces before growing (most chunks have 1,000-3,000)
 class FaceList {
   constructor() {
-    this.positions = [];
-    this.normals = [];
-    this.uvs = [];
-    this.colors = [];
-    this.indices = [];
+    this.capacity = 0;
+    this.grow(START_FACES);
+    this.faces = 0;
+  }
+
+  // Make room for `faces` faces, keeping what's already written.
+  grow(faces) {
+    const keep = (old, Type, perFace) => {
+      const bigger = new Type(faces * perFace);
+      if (old) bigger.set(old);
+      return bigger;
+    };
+    this.positions = keep(this.positions, Float32Array, 12); // 4 corners x (x, y, z)
+    this.normals = keep(this.normals, Float32Array, 12);
+    this.colors = keep(this.colors, Float32Array, 12);
+    this.uvs = keep(this.uvs, Float32Array, 8);              // 4 corners x (u, v)
+    this.indices = keep(this.indices, Uint32Array, 6);       // 2 triangles x 3 corners
+    this.capacity = faces;
+  }
+
+  // Start again for the next chunk (keeps the memory).
+  reset() {
+    this.faces = 0;
   }
 
   // [r, g, b] = the light tint. ao = shade level (0-3) for each of the 4 corners.
   addFace(x, y, z, face, uv, [r, g, b], ao = NO_SHADE) {
-    const first = this.positions.length / 3; // index of this face's first corner
-    for (let k = 0; k < 4; k++) {
+    if (this.faces === this.capacity) this.grow(this.capacity * 2);
+    const n = this.faces++;
+    const first = n * 4; // index of this face's first corner
+    let p = n * 12;
+    for (let k = 0; k < 4; k++, p += 3) {
       const [cx, cy, cz] = face.corners[k];
       const shade = AO_BRIGHTNESS[ao[k]];
-      this.positions.push(x + cx, y + cy, z + cz);
-      this.normals.push(face.dir[0], face.dir[1], face.dir[2]);
-      this.colors.push(r * shade, g * shade, b * shade);
+      this.positions[p] = x + cx;
+      this.positions[p + 1] = y + cy;
+      this.positions[p + 2] = z + cz;
+      this.normals[p] = face.dir[0];
+      this.normals[p + 1] = face.dir[1];
+      this.normals[p + 2] = face.dir[2];
+      this.colors[p] = r * shade;
+      this.colors[p + 1] = g * shade;
+      this.colors[p + 2] = b * shade;
     }
     // Corners are bottom-left, bottom-right, top-left, top-right.
-    this.uvs.push(uv.u0, uv.v0, uv.u1, uv.v0, uv.u0, uv.v1, uv.u1, uv.v1);
+    const t = n * 8;
+    const uvs = this.uvs;
+    uvs[t] = uv.u0; uvs[t + 1] = uv.v0; uvs[t + 2] = uv.u1; uvs[t + 3] = uv.v0;
+    uvs[t + 4] = uv.u0; uvs[t + 5] = uv.v1; uvs[t + 6] = uv.u1; uvs[t + 7] = uv.v1;
     // Two triangles make the square. The square can be split along either
     // diagonal; splitting along the one joining the two darker corners keeps
     // the soft shadows smooth and even (the other way leaves a visible crease).
+    const i = n * 6;
+    const idx = this.indices;
     if (ao[0] + ao[3] < ao[1] + ao[2]) {
-      this.indices.push(first, first + 1, first + 3, first, first + 3, first + 2);
+      idx[i] = first; idx[i + 1] = first + 1; idx[i + 2] = first + 3;
+      idx[i + 3] = first; idx[i + 4] = first + 3; idx[i + 5] = first + 2;
     } else {
-      this.indices.push(first, first + 1, first + 2, first + 2, first + 1, first + 3);
+      idx[i] = first; idx[i + 1] = first + 1; idx[i + 2] = first + 2;
+      idx[i + 3] = first + 2; idx[i + 4] = first + 1; idx[i + 5] = first + 3;
     }
   }
 
   isEmpty() {
-    return this.indices.length === 0;
+    return this.faces === 0;
   }
 
+  // Copy exactly the part that was used into the chunk's own shape.
   toGeometry() {
+    const n = this.faces;
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(this.normals, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(this.uvs, 2));
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(this.colors, 3));
-    geometry.setIndex(this.indices);
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.positions.slice(0, n * 12), 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(this.normals.slice(0, n * 12), 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(this.uvs.slice(0, n * 8), 2));
+    geometry.setAttribute('color', new THREE.BufferAttribute(this.colors.slice(0, n * 12), 3));
+    // Corner numbers fit in the smaller 16-bit kind unless a chunk has over 16,383 faces.
+    const indices = n * 4 <= 65536 ? Uint16Array.from(this.indices.subarray(0, n * 6)) : this.indices.slice(0, n * 6);
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1));
     geometry.computeBoundingSphere(); // lets Three.js skip chunks that are off-screen
     return geometry;
   }
 }
+// One reusable list per render type (see MATERIALS above).
+const LISTS = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceList() };
 
 // ---- Scratch memory, reused for every chunk ----
 // Building a chunk needs a few big temporary arrays. Making new ones every
@@ -278,7 +325,8 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
 
   const ox = chunk.cx * chunkSize; // chunk's position in the world, in blocks
   const oz = chunk.cz * chunkSize;
-  const lists = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceList() };
+  const lists = LISTS;
+  for (const list of Object.values(lists)) list.reset();
 
   // Only loop up to the highest block in this chunk; everything above is air.
   let maxY = 0;

@@ -8,11 +8,20 @@ export const CHUNK_SIZE = 16;    // chunk width and depth, in blocks
 export const WORLD_HEIGHT = 96;  // how tall the world is, in blocks
 
 // ---- Loading settings (distances are in chunks, measured in a circle) ----
-const DRAW_RADIUS = 5;  // chunks this close are generated AND drawn
-const DATA_RADIUS = DRAW_RADIUS + 1.5; // an extra ring of block data (not drawn), so every
-                        // drawn chunk has all 8 neighbours (diagonals too) for faces and
-                        // light at its edges. Anything further is unloaded.
-const WORK_BUDGET_MS = 4; // max time per frame spent building chunks (a frame is ~16.7 ms)
+// The draw distance and the time budget come from the graphics level
+// (THEME.graphics in theme.js) and can change while playing: setDrawRadius().
+//   drawRadius: chunks this close are generated AND drawn
+//   dataRadius: an extra ring of block data (not drawn), so every drawn chunk
+//               has all 8 neighbours (diagonals too) for faces and light at
+//               its edges. Anything further is unloaded.
+const DATA_RING = 1.5;
+const COLUMNS_PER_SLICE = 64; // new chunk data is made in slices of this many
+                              // block columns (a quarter chunk), so no single step is slow
+
+// Rough first guesses (ms) for how long each kind of step takes. The real
+// times are measured as the game runs and replace these.
+const FIRST_GUESS_SLICE_MS = 0.5;
+const FIRST_GUESS_DRAW_MS = 2;
 
 // One 16 x WORLD_HEIGHT x 16 piece of the world.
 class Chunk {
@@ -37,6 +46,12 @@ class Chunk {
   }
 }
 
+// Running average: moves the old value 20% of the way towards the new one,
+// so one unusually slow or fast step doesn't throw it off.
+function blend(average, latest) {
+  return average + (latest - average) * 0.2;
+}
+
 export class World {
   constructor(seed, editStore) {
     this.seed = seed;
@@ -50,6 +65,26 @@ export class World {
     this.centerCZ = null;
     this.queue = [];      // chunks waiting to be drawn, nearest one at the end
     this.redrawSoon = new Set(); // drawn chunks to redraw over the next frames (after an edit)
+    this.drawRadius = 5;
+    this.dataRadius = this.drawRadius + DATA_RING;
+    this.budgetMs = 4;    // max time per frame spent building chunks (a frame is ~16.7 ms)
+    this.generating = null; // a chunk whose block data is half made: { chunk, nextColumn }
+
+    // How long steps usually take (ms), kept up to date as they're measured.
+    // Used to avoid starting a step there isn't time left for.
+    this.sliceMs = FIRST_GUESS_SLICE_MS;
+    this.drawMs = FIRST_GUESS_DRAW_MS;
+  }
+
+  // Change the draw distance (in chunks) and the per-frame time budget.
+  // Chunks that are now too far are dropped; new ones in range get queued.
+  setDrawRadius(radius, budgetMs) {
+    this.drawRadius = radius;
+    this.dataRadius = radius + DATA_RING;
+    this.budgetMs = budgetMs;
+    if (this.centerCX === null) return; // not started yet
+    this.unloadFarChunks();
+    this.planQueue();
   }
 
   // ---- Looking up blocks (always in world coordinates) ----
@@ -137,22 +172,57 @@ export class World {
 
   // ---- Generating chunk data ----
 
+  // Make a chunk's block data all at once.
   generateChunk(cx, cz) {
+    // If this chunk was half made in slices, finish that one instead.
+    const g = this.generating;
+    if (g && g.chunk.cx === cx && g.chunk.cz === cz) {
+      this.generating = null;
+      this.fillColumns(g.chunk, g.nextColumn, CHUNK_SIZE * CHUNK_SIZE);
+      return this.finishChunk(g.chunk);
+    }
     const chunk = new Chunk(cx, cz);
-    // 1. Terrain from the seeded noise: hills, caves, floor, trees.
-    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-      for (let lz = 0; lz < CHUNK_SIZE; lz++) {
-        const x = cx * CHUNK_SIZE + lx;
-        const z = cz * CHUNK_SIZE + lz;
-        const col = this.terrain.column(x, z);
-        for (let y = 0; y <= col.top && y < WORLD_HEIGHT; y++) {
-          const id = this.terrain.blockInColumn(x, y, z, col);
-          if (id !== BLOCK.AIR) chunk.set(lx, y, lz, id);
-        }
+    this.fillColumns(chunk, 0, CHUNK_SIZE * CHUNK_SIZE);
+    return this.finishChunk(chunk);
+  }
+
+  // Make the next slice of a chunk's block data (used while loading, so no
+  // single frame does a whole chunk). Returns true once the chunk is done.
+  generateSlice(cx, cz) {
+    let g = this.generating;
+    if (!g || g.chunk.cx !== cx || g.chunk.cz !== cz) {
+      g = this.generating = { chunk: new Chunk(cx, cz), nextColumn: 0 };
+    }
+    const end = Math.min(g.nextColumn + COLUMNS_PER_SLICE, CHUNK_SIZE * CHUNK_SIZE);
+    this.fillColumns(g.chunk, g.nextColumn, end);
+    g.nextColumn = end;
+    if (end < CHUNK_SIZE * CHUNK_SIZE) return false;
+    this.generating = null;
+    this.finishChunk(g.chunk);
+    return true;
+  }
+
+  // Terrain from the seeded noise (hills, caves, floor, trees) for block
+  // columns number `from` up to (not including) `to`. Columns are numbered
+  // 0..255 across the chunk.
+  fillColumns(chunk, from, to) {
+    for (let i = from; i < to; i++) {
+      const lx = i % CHUNK_SIZE;
+      const lz = Math.floor(i / CHUNK_SIZE);
+      const x = chunk.cx * CHUNK_SIZE + lx;
+      const z = chunk.cz * CHUNK_SIZE + lz;
+      const col = this.terrain.column(x, z);
+      for (let y = 0; y <= col.top && y < WORLD_HEIGHT; y++) {
+        const id = this.terrain.blockInColumn(x, y, z, col);
+        if (id !== BLOCK.AIR) chunk.set(lx, y, lz, id);
       }
     }
-    // 2. The player's saved changes on top.
-    const key = this.chunkKey(cx, cz);
+  }
+
+  // The terrain is complete: add the player's saved changes on top, and
+  // only now add it to the world (so nothing ever sees a half-made chunk).
+  finishChunk(chunk) {
+    const key = this.chunkKey(chunk.cx, chunk.cz);
     const edits = this.editStore.forChunk(key);
     if (edits) {
       for (const [pos, id] of edits) {
@@ -211,27 +281,33 @@ export class World {
   }
 
   unloadFarChunks() {
+    const dataSq = this.dataRadius * this.dataRadius;
+    const drawSq = this.drawRadius * this.drawRadius;
     for (const [key, chunk] of this.chunks) {
       const d = this.distanceSq(chunk.cx, chunk.cz);
-      if (d > DATA_RADIUS * DATA_RADIUS) {
+      if (d > dataSq) {
         // Too far: forget it completely. Saved edits live in the EditStore,
         // so they come back when the chunk is generated again.
         this.removeMesh(chunk);
         this.chunks.delete(key);
-      } else if (d > DRAW_RADIUS * DRAW_RADIUS) {
+      } else if (d > drawSq) {
         // In the outer ring: keep the block data, stop drawing it.
         this.removeMesh(chunk);
       }
     }
+    // A half-made chunk that's now out of range isn't needed any more.
+    const g = this.generating;
+    if (g && this.distanceSq(g.chunk.cx, g.chunk.cz) > dataSq) this.generating = null;
   }
 
   // List every chunk within draw distance that isn't drawn yet.
   planQueue() {
     this.queue = [];
-    for (let dx = -DRAW_RADIUS; dx <= DRAW_RADIUS; dx++) {
-      for (let dz = -DRAW_RADIUS; dz <= DRAW_RADIUS; dz++) {
+    const r = this.drawRadius;
+    for (let dx = -Math.floor(r); dx <= r; dx++) {
+      for (let dz = -Math.floor(r); dz <= r; dz++) {
         const d = dx * dx + dz * dz;
-        if (d > DRAW_RADIUS * DRAW_RADIUS) continue;
+        if (d > r * r) continue;
         const cx = this.centerCX + dx;
         const cz = this.centerCZ + dz;
         if (this.getChunk(cx, cz)?.mesh) continue; // already drawn
@@ -243,32 +319,53 @@ export class World {
   }
 
   // Build queued chunks until this frame's time budget is used up.
-  // Always does at least one step, so loading never stalls completely.
+  // Work is done in small steps: one slice of a chunk's block data, or
+  // drawing one chunk. Before each step we check that its usual time still
+  // fits in what's left of the budget, so a frame never runs far over.
+  // The first step of a frame always runs, so loading never stalls.
   workOnQueue() {
     const start = performance.now();
+    let stepsDone = 0;
+    // Is there time left for a step that usually takes `usualMs`?
+    const fits = (usualMs) =>
+      stepsDone === 0 || performance.now() - start + usualMs * 1.25 <= this.budgetMs;
+
     // Redraws after an edit come first: they're right next to the player.
     for (const chunk of this.redrawSoon) {
+      if (!fits(this.drawMs)) return;
       this.redrawSoon.delete(chunk);
-      if (chunk.mesh) this.updateChunkMesh(chunk); // skip if it was unloaded meanwhile
-      if (performance.now() - start >= WORK_BUDGET_MS) return;
+      if (!chunk.mesh) continue; // it was unloaded meanwhile
+      this.timedDraw(chunk);
+      stepsDone++;
     }
-    // Work in small steps so no single step is slow: either generate ONE
-    // missing neighbour's block data, or (once all 9 are ready) draw the chunk.
     while (this.queue.length > 0) {
       const { cx, cz } = this.queue[this.queue.length - 1]; // nearest
       if (this.getChunk(cx, cz)?.mesh) {
         this.queue.pop(); // already drawn (e.g. by loadAroundNow)
         continue;
       }
+      // Either make a slice of ONE missing neighbour's block data, or (once
+      // all 9 are ready) draw the chunk.
       const missing = this.findMissingAround(cx, cz);
       if (missing) {
-        this.generateChunk(missing.cx, missing.cz);
+        if (!fits(this.sliceMs)) return;
+        const t = performance.now();
+        this.generateSlice(missing.cx, missing.cz);
+        this.sliceMs = blend(this.sliceMs, performance.now() - t);
       } else {
+        if (!fits(this.drawMs)) return;
         this.queue.pop();
-        this.updateChunkMesh(this.getChunk(cx, cz));
+        this.timedDraw(this.getChunk(cx, cz));
       }
-      if (performance.now() - start >= WORK_BUDGET_MS) break;
+      stepsDone++;
     }
+  }
+
+  // Draw a chunk, and remember how long that took.
+  timedDraw(chunk) {
+    const t = performance.now();
+    this.updateChunkMesh(chunk);
+    this.drawMs = blend(this.drawMs, performance.now() - t);
   }
 
   // Load and draw the chunks right around a spot immediately (used at startup

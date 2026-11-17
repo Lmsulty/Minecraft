@@ -8,6 +8,7 @@
 // - Chunks:     loaded (have block data) / drawn / still waiting in the queue
 // - Time:       the in-game clock (shows x20 while time is sped up with T)
 // - Position:   where you are standing (X and Z across the ground, Y = height)
+// - Graphics:   the graphics level (pause screen), e.g. "Auto (High)"
 
 const UPDATE_EVERY_MS = 500;
 
@@ -22,6 +23,10 @@ export class FpsCounter {
     this.lastUpdate = performance.now();
     this.lastFrame = this.lastUpdate;
     this.slowest = 0;
+    // Set by graphics.js: told each new "Slowest" reading (Auto mode uses
+    // it), and gives the text for the Graphics line.
+    this.onReading = null;
+    this.graphicsText = () => '';
   }
 
   // Call once per frame, right after renderer.render().
@@ -44,7 +49,9 @@ export class FpsCounter {
       `Triangles  ${info.triangles.toLocaleString()}\n` +
       `Chunks     ${chunks.loaded} loaded / ${chunks.drawn} drawn / ${chunks.queued} queued\n` +
       `Time       ${this.dayNight.clockText()}\n` +
-      `Position   ${this.positionText()}`;
+      `Position   ${this.positionText()}\n` +
+      `Graphics   ${this.graphicsText()}`;
+    this.onReading?.(this.slowest, elapsed / 1000);
 
     this.frames = 0;
     this.slowest = 0;

@@ -37,12 +37,50 @@ export const THEME = {
   ],
 
   // Distance haze: how far-away land fades into the horizon sky colour.
-  // Distances are in blocks, straight from your eye. The loaded world ends
-  // about 80 blocks away, so `end` must stay at or below ~78 to hide the edge.
+  // Where it starts and ends depends on the draw distance, so those numbers
+  // live with each graphics level below (graphics.levels.*.haze).
   haze: {
-    start: 45,   // fully clear up to here
-    end: 78,     // fully hazed from here
     curve: 1,    // 1 = fades evenly. Bigger = stays clear longer, then fades quickly.
+  },
+
+  // ---- Graphics quality (pause screen: Auto / Low / Medium / High) ----
+  // Logic in graphics.js. The player's choice is saved in the browser.
+  // "Auto" (the default) starts on High and steps down a level if the game
+  // keeps stuttering, then remembers the level that worked for next time.
+  graphics: {
+    // Auto mode steps down a level when, out of the last `outOf` readings of
+    // the FPS box's "Slowest" number (one reading every half second), at
+    // least `badReadings` are over `slowestMs`. At 60 FPS a smooth frame
+    // takes about 16.7 ms, and one skipped frame shows up as about 33 ms.
+    auto: {
+      slowestMs: 20,
+      badReadings: 4,
+      outOf: 6,            // 6 readings = 3 seconds
+      warmupSeconds: 5,    // seconds of play to ignore at the start (the world is still loading)
+      settleSeconds: 5,    // seconds to wait after a change before judging again
+      ignoreOverMs: 250,   // ignore readings with one huge frame (e.g. switching browser tabs)
+    },
+
+    // What each level does:
+    //   pixelRatio:    max pixels drawn per screen pixel. Sharp ("Retina") screens
+    //                  are 2; 1 draws a quarter as many pixels there. Plain
+    //                  screens are already 1, so this changes nothing on them.
+    //   drawRadius:    draw distance, in chunks (16 blocks each)
+    //   haze:          [start, end] of the distance haze, in blocks. `end` must
+    //                  stay about 2 blocks under drawRadius x 16, so the edge
+    //                  of the world stays hidden.
+    //   chunkBudgetMs: max time per frame spent building new chunks. Smaller =
+    //                  smoother, but new land appears a little more slowly.
+    //   starLayers:    2 = lots of faint stars + bright ones, 1 = bright ones only
+    //   galaxy:        'full' or 'simple' (less detail in the galaxy band's clouds)
+    //   clouds:        'full' or 'simple' (same shapes, simpler lighting)
+    //   blackHole:     'full' or 'simple' (smoother, less churning gas)
+    //   antialias:     smooth jagged edges. Only changes when the page is reloaded.
+    levels: {
+      high:   { pixelRatio: 2,   drawRadius: 5, haze: [45, 78], chunkBudgetMs: 4, starLayers: 2, galaxy: 'full',   clouds: 'full',   blackHole: 'full',   antialias: true },
+      medium: { pixelRatio: 1.5, drawRadius: 4, haze: [36, 62], chunkBudgetMs: 3, starLayers: 2, galaxy: 'simple', clouds: 'full',   blackHole: 'full',   antialias: true },
+      low:    { pixelRatio: 1,   drawRadius: 3, haze: [27, 46], chunkBudgetMs: 2, starLayers: 1, galaxy: 'simple', clouds: 'simple', blackHole: 'simple', antialias: false },
+    },
   },
 
   // Soft painted clouds, drawn into the sky (sky.js). Their colours come from
@@ -270,6 +308,11 @@ export const THEME = {
     '--button-bg': 'rgba(160, 40, 40, 0.85)',    // "Reset world" button
     '--button-bg-hover': 'rgba(190, 50, 50, 0.95)',
     '--button-border': 'rgba(255, 255, 255, 0.4)',
+    '--choice-bg': 'rgba(255, 255, 255, 0.1)',          // Graphics buttons on the pause screen
+    '--choice-bg-hover': 'rgba(255, 255, 255, 0.22)',
+    '--choice-selected-bg': 'rgba(255, 255, 255, 0.85)', // the one that's switched on
+    '--choice-selected-text': '#1a1a1a',
+    '--notice-bg': 'rgba(0, 0, 0, 0.6)',                 // "Graphics lowered..." message
 
     '--hotbar-text': '#ffffff',
     '--hotbar-bg': 'rgba(0, 0, 0, 0.45)',

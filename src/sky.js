@@ -87,7 +87,9 @@ const f = (n) => n.toFixed(4);
 
 // ---- Sky dome ----
 // A huge ball around the player, seen from inside.
-export function makeSkyDome() {
+// `detail` is a graphics level from THEME.graphics.levels (starLayers,
+// galaxy, clouds, blackHole): lower levels leave out some of the maths.
+export function makeSkyDome(detail) {
   const material = new THREE.ShaderMaterial({
     uniforms: {
       time: { value: 0 },          // seconds, for the swirling gas
@@ -125,7 +127,34 @@ export function makeSkyDome() {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
-    fragmentShader: /* glsl */ `
+    fragmentShader: skyFragmentShader(detail),
+    side: THREE.BackSide, // we're inside the ball
+    depthWrite: false,    // never hides anything
+    fog: false,
+  });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(SKY_DOME_RADIUS, 32, 16), material);
+  // Drawn AFTER the land (but before see-through things like the suns): any
+  // pixel already covered by land is skipped, so the sky's maths only runs
+  // where you can actually see sky.
+  dome.renderOrder = 1;
+  dome.frustumCulled = false; // always around you
+  return dome;
+}
+
+// Switch the sky to another graphics level's detail. The graphics card
+// rebuilds the sky's program, which causes one short hitch.
+export function setSkyDetail(dome, detail) {
+  dome.material.fragmentShader = skyFragmentShader(detail);
+  dome.material.needsUpdate = true;
+}
+
+// The sky's pixel program, with only the parts this level of detail uses.
+function skyFragmentShader(detail) {
+  const fullStars = detail.starLayers >= 2;
+  const fullGalaxy = detail.galaxy === 'full';
+  const fullClouds = detail.clouds === 'full';
+  const fullHole = detail.blackHole === 'full';
+  return /* glsl */ `
       uniform float time;
       uniform vec3 horizon;
       uniform vec3 top;
@@ -213,7 +242,9 @@ export function makeSkyDome() {
         float logR = log(rho);
         float spin = phi - ${f(BH.armTwist)} * 2.0 * logR - time * ${f(BH.swirlSpeed)};
         vec3 p = vec3(cos(spin) * 2.0, sin(spin) * 2.0, logR * 3.0 + time * ${f(BH.inflowSpeed)} * 3.0);
-        float churn = noise(p) * 0.6 + noise(p * 2.7 + 7.0) * 0.4;
+        ${fullHole
+          ? 'float churn = noise(p) * 0.6 + noise(p * 2.7 + 7.0) * 0.4;'
+          : 'float churn = noise(p); // simple: one layer of churning instead of two'}
         float arms = 0.5 + 0.5 * cos(${f(BH.armCount)} * spin + (churn - 0.5) * 7.0 * ${f(BH.turbulence)});
         arms = pow(arms, 1.5);
         float gas = (0.3 + 0.7 * arms) * mix(1.0, 0.4 + 1.2 * churn, ${f(BH.turbulence)});
@@ -278,13 +309,20 @@ export function makeSkyDome() {
           if (abs(fromBand) < 3.0) {
             band = exp(-fromBand * fromBand);
             // Cloudy, with a darker dust lane running down the middle.
+            ${fullGalaxy ? `
             float clouds = noise(starDirection * 9.0) * 0.6 + noise(starDirection * 23.0) * 0.4;
-            float dust = 1.0 - 0.6 * exp(-fromBand * fromBand * 9.0) * smoothstep(0.35, 0.7, noise(starDirection * 14.0 + 3.0));
+            float dust = 1.0 - 0.6 * exp(-fromBand * fromBand * 9.0) * smoothstep(0.35, 0.7, noise(starDirection * 14.0 + 3.0));` : `
+            float clouds = noise(starDirection * 9.0) * 0.8 + 0.1; // simple: one layer of cloudiness
+            float dust = 1.0 - 0.35 * exp(-fromBand * fromBand * 9.0); // and a smooth dust lane`}
             color += galaxyColor * ${f(SF.galaxyBand)} * band * (0.3 + 0.9 * clouds) * dust * starsVisible;
           }
           // More stars inside the galaxy band.
+          ${fullStars ? `
           float stars = starGrid(starDirection, ${f(FAINT_GRID)}, ${f(FAINT_CHANCE)} * (1.0 + 3.0 * band), ${f(STAR_RADIUS)}) * 0.7
-                      + starGrid(starDirection, ${f(BRIGHT_GRID)}, ${f(BRIGHT_CHANCE)}, ${f(STAR_RADIUS * 1.6)});
+                      + starGrid(starDirection, ${f(BRIGHT_GRID)}, ${f(BRIGHT_CHANCE)}, ${f(STAR_RADIUS * 1.6)});` : `
+          // One layer only (half the work): the bright stars, a few more of
+          // them than usual, so the sky doesn't look empty.
+          float stars = starGrid(starDirection, ${f(BRIGHT_GRID)}, ${f(BRIGHT_CHANCE * 1.8)} * (1.0 + 1.5 * band), ${f(STAR_RADIUS * 1.6)});`}
           color += starColor * stars * starsVisible;
         }
 
@@ -307,11 +345,14 @@ export function makeSkyDome() {
           float threshold = 1.0 - cloudAmount + smoothstep(0.15, 0.9, cloudDirection.y) * ${f(CL.thinOverhead * 0.4)};
           float cloud = smoothstep(threshold, threshold + ${f(CL.softness)}, lumps);
           if (cloud > 0.0) {
+            ${fullClouds ? `
             // Light: compare with a spot a little towards the sun. If it's
             // thinner there, this side faces the sun and is lit.
             vec2 toSun = normalize(sunDirection.xz + vec2(0.0001)) * 0.12;
             float towardsSunLumps = texture2D(cloudMap, (uv + toSun) * ${f(1 / CLOUD_MAP_CELLS)}).r * 0.75 + lumps * 0.25;
-            float lit = clamp((lumps - towardsSunLumps) * 6.0 + 0.5, 0.0, 1.0);
+            float lit = clamp((lumps - towardsSunLumps) * 6.0 + 0.5, 0.0, 1.0);` : `
+            // Simple light: thin edges are bright, thick middles are shaded.
+            float lit = 1.0 - 0.7 * smoothstep(threshold, threshold + 0.35, lumps);`}
             vec3 cloudColor = mix(cloudShade, cloudLit, lit);
             cloudColor = mix(cloudColor, sunGlow, towardSun * sunGlowStrength * 0.6); // glowing near a low sun
             // Fade into the haze at the horizon, and get swallowed near the black hole.
@@ -361,28 +402,21 @@ export function makeSkyDome() {
 
           // Faint, sparkly ring of bent starlight, where light from stars
           // right behind it ends up. Hidden wherever the gas is thick.
+          // The ring is very thin, so only work it out right next to it (and
+          // only when the stars are out): further away it adds nothing.
           float einstein = sqrt(${f(BH.bendStrength)});
-          float around = atan(q.y, q.x);
-          float beads = smoothstep(0.55, 0.85, noise(vec3(cos(around) * 9.0, sin(around) * 9.0, 0.0)));
-          color += starColor * (0.05 + 0.45 * beads) * exp(-pow((r - einstein) / 0.06, 2.0))
-                 * starsVisible * (1.0 - clamp(gas * 1.6, 0.0, 1.0));
+          if (starsVisible > 0.0 && abs(r - einstein) < 0.3) {
+            float around = atan(q.y, q.x);
+            float beads = smoothstep(0.55, 0.85, noise(vec3(cos(around) * 9.0, sin(around) * 9.0, 0.0)));
+            color += starColor * (0.05 + 0.45 * beads) * exp(-pow((r - einstein) / 0.06, 2.0))
+                   * starsVisible * (1.0 - clamp(gas * 1.6, 0.0, 1.0));
+          }
         }
 
         gl_FragColor = vec4(color, 1.0);
         #include <colorspace_fragment>
       }
-    `,
-    side: THREE.BackSide, // we're inside the ball
-    depthWrite: false,    // never hides anything
-    fog: false,
-  });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(SKY_DOME_RADIUS, 32, 16), material);
-  // Drawn AFTER the land (but before see-through things like the suns): any
-  // pixel already covered by land is skipped, so the sky's maths only runs
-  // where you can actually see sky.
-  dome.renderOrder = 1;
-  dome.frustumCulled = false; // always around you
-  return dome;
+    `;
 }
 
 // ---- The suns (pixel art) ----

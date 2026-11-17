@@ -10,26 +10,32 @@ import { Hotbar } from './hotbar.js';
 import { Inventory } from './inventory.js';
 import { CreativeToggle } from './creative.js';
 import { InventoryScreen } from './inventoryScreen.js';
-import { THEME, applyUiTheme } from './theme.js';
+import { applyUiTheme } from './theme.js';
 import { DayNight } from './dayNight.js';
 import { updateCurve, cullBentChunks } from './curve.js';
+import { GraphicsSettings } from './graphics.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
 
+// ---- Graphics quality (Low / Medium / High / Auto, see graphics.js) ----
+// Loaded first: edge smoothing (antialias) must be decided before the renderer is made.
+const graphics = new GraphicsSettings();
+
 // ---- Renderer: draws the 3D scene onto a <canvas> ----
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Sharpness (pixel ratio) is set by the graphics level, further down.
+const renderer = new THREE.WebGLRenderer({ antialias: graphics.level.antialias });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 // ---- Scene: sky and distance haze ----
 // The actual colours are set by the day/night cycle (dayNight.js + theme.js).
-// The haze fades land out before the edge of the loaded chunks (about 80 blocks
-// away), so the world seems to go on forever. How it fades: curve.js.
+// The haze fades land out before the edge of the loaded chunks, so the world
+// seems to go on forever. Where it starts and ends depends on the draw
+// distance, so the graphics level sets it. How it fades: curve.js.
 const scene = new THREE.Scene();
 scene.background = new THREE.Color();
-scene.fog = new THREE.Fog(0xffffff, THEME.haze.start, THEME.haze.end);
+scene.fog = new THREE.Fog(0xffffff, graphics.level.haze[0], graphics.level.haze[1]);
 
 // ---- Lights: soft sky light + the big sun (or starlight at night), so each cube face gets a different shade ----
 const ambientLight = new THREE.HemisphereLight();
@@ -59,7 +65,7 @@ const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerH
 const player = new Player(camera, world, renderer.domElement, document.getElementById('overlay'));
 
 // ---- Day/night cycle (press T to speed it up) ----
-const dayNight = new DayNight(scene, camera, ambientLight, mainLight);
+const dayNight = new DayNight(scene, camera, ambientLight, mainLight, graphics.level);
 
 // Spawn near the middle of chunk (0, 0). Build the ground around it right away
 // so there's something to stand on; the rest streams in over the next second.
@@ -107,6 +113,13 @@ new CreativeToggle(document.getElementById('creative-badge'), inventory,
 
 // ---- Performance readout in the top-left corner ----
 const fps = new FpsCounter(document.getElementById('fps'), renderer, world, dayNight, player);
+
+// ---- Graphics buttons on the pause screen, and Auto mode ----
+graphics.attach({
+  renderer, world, scene, dayNight, player, fps,
+  buttons: document.getElementById('graphics'),
+  notice: document.getElementById('notice'),
+});
 
 // ---- "Reset world" button on the pause screen ----
 document.getElementById('reset').addEventListener('click', (e) => {

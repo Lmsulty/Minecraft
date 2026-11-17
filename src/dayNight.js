@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { THEME } from './theme.js';
-import { makeSkyDome, makeSuns } from './sky.js';
+import { makeSkyDome, makeSuns, setSkyDetail } from './sky.js';
 
 // Day/night cycle: a game clock, the two suns moving across the sky, the
 // black hole with the stars wheeling around it at night, and the sky, haze
@@ -26,7 +26,8 @@ function smooth(t) {
 }
 
 export class DayNight {
-  constructor(scene, camera, ambientLight, mainLight) {
+  // skyDetail = the graphics level (THEME.graphics.levels) the sky starts with.
+  constructor(scene, camera, ambientLight, mainLight, skyDetail) {
     this.scene = scene;
     this.camera = camera;
     this.ambientLight = ambientLight; // soft light from sky + ground
@@ -52,7 +53,7 @@ export class DayNight {
     this.direction = new THREE.Vector3();    // scratch space for the other sun
 
     // The sky dome draws the sky colours, the stars and the black hole (sky.js).
-    this.dome = makeSkyDome();
+    this.dome = makeSkyDome(skyDetail);
     this.suns = makeSuns();
     scene.add(this.dome, ...this.suns);
 
@@ -73,6 +74,11 @@ export class DayNight {
     });
 
     this.update(0); // set the starting colours straight away
+  }
+
+  // Draw the sky with another graphics level's detail (graphics.js).
+  setSkyDetail(detail) {
+    setSkyDetail(this.dome, detail);
   }
 
   // Call every frame. dt = seconds since the last frame.
