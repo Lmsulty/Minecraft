@@ -3,6 +3,7 @@ import { BLOCK_TYPES } from './blocks.js';
 import { MOB_TYPES } from './mobTypes.js';
 import { BRAINS } from './mobBrains.js';
 import { MobRenderer, animateMob, modelBounds } from './mobModel.js';
+import { MobGlow } from './mobGlow.js';
 import { moveBody, collides } from './physics.js';
 
 // Creatures: spawning them near the player, moving them, hitting them, and
@@ -12,6 +13,7 @@ import { moveBody, collides } from './physics.js';
 //   mobTypes.js   what each creature is (looks, speeds, spawn rules)
 //   mobBrains.js  how each one behaves
 //   mobModel.js   how they're drawn and animated
+//   mobGlow.js    halos and real light around glowing creatures
 //   physics.js    gravity and bumping into blocks (shared with the player)
 
 const GRAVITY = 25;          // same as the player
@@ -66,11 +68,14 @@ export class Mobs {
         renderer: new MobRenderer(type, type.spawn.maxCount, scene),
       };
     });
+    this.glow = new MobGlow(scene, this.types.map((e) => e.type));
   }
 
-  // The graphics level changed: allow more or fewer creatures.
-  setScale(scale) {
-    this.scale = scale;
+  // The graphics level changed (graphics.js): how many creatures are allowed,
+  // and how many glowing ones cast real light.
+  setGraphics(level) {
+    this.scale = level.mobScale;
+    this.glow.setLightCount(level.glowLights ?? 0);
   }
 
   // ---- Every frame ----
@@ -87,7 +92,11 @@ export class Mobs {
     for (const mob of this.list) {
       const far = Math.hypot(mob.position.x - p.x, mob.position.z - p.z) > tooFar;
       if (far || !this.world.isLoadedAt(mob.position.x, mob.position.z)) mob.removed = true;
-      else this.updateMob(mob, dt);
+      else {
+        // Wrong time of day for it (e.g. dawn for a night creature)? It runs off.
+        if (!mob.leaving && !this.rightTime(mob.type.spawn.time)) mob.leaving = true;
+        this.updateMob(mob, dt);
+      }
     }
     // Take out the removed ones (keeping the same list, which brains also see).
     let kept = 0;
@@ -95,6 +104,7 @@ export class Mobs {
     this.list.length = kept;
 
     for (const entry of this.types) entry.renderer.draw(this.list, this.camera);
+    this.glow.update(this.list, this.camera);
   }
 
   updateMob(mob, dt) {
@@ -106,6 +116,17 @@ export class Mobs {
     const startZ = mob.position.z;
     const v = mob.velocity;
     let tryingSpeed = 0; // how fast it's trying to walk forward this frame
+
+    // Leaving: its glow fades as it runs off, then it vanishes.
+    if (mob.leaving && !mob.dying) {
+      mob.leaveTimer += dt;
+      const leaveTime = type.leaveTime ?? 3;
+      mob.glowFade = Math.max(0, 1 - mob.leaveTimer / leaveTime);
+      if (mob.leaveTimer >= leaveTime) {
+        mob.dying = true; // shrinks away (not defeated, so no drop)
+        mob.dyingTimer = DYING_TIME;
+      }
+    }
 
     if (mob.dying) {
       // Shrinking away (it still flies back from the last hit).
@@ -310,12 +331,19 @@ export class Mobs {
       timer: 0,
       grazing: false,
       fleeing: false,
+      alert: false,
+      fear: null,
+      dodge: 0,
+      dodgeTimer: 0,
+      leaving: false,     // wrong time of day: running off before vanishing
+      leaveTimer: 0,
       health: type.health,
       stun: 0,
       hitCooldown: 0,
       blockedCooldown: 0,
       stuckTime: 0,
       dying: false,
+      defeated: false,    // true = the player beat it (it gets a drop later)
       dyingTimer: 0,
       dyingLength: DYING_TIME,
       removed: false,
@@ -327,6 +355,10 @@ export class Mobs {
       headDip: 0,
       chew: Math.random() * 10,
       flash: 0,
+      // Glow (glowing creatures only): pulse, and fading out when leaving.
+      pulse: Math.random() * 10,
+      glowFade: 1,
+      glow: 1,
     };
     if (collides(mob, w)) return null; // squeezed against a tree or a wall
     BRAINS[type.brain].start(mob, this.game);
@@ -379,6 +411,7 @@ export class Mobs {
     if (mob.health <= 0) {
       // Defeated: it shrinks away. (Drops come in a later step.)
       mob.dying = true;
+      mob.defeated = true;
       mob.dyingTimer = DYING_TIME;
       return true;
     }
@@ -386,9 +419,12 @@ export class Mobs {
     return true;
   }
 
-  // For the FPS box, e.g. "5 / 16"
+  // For the FPS box: how many of each creature are around / the most allowed,
+  // e.g. "Grazer 5/16  Glow critter 2/8"
   statsText() {
-    const limit = this.types.reduce((sum, e) => sum + Math.round(e.type.spawn.maxCount * this.scale), 0);
-    return `${this.list.length} / ${limit}`;
+    return this.types.map(({ type }) => {
+      const count = this.list.filter((m) => m.type === type).length;
+      return `${type.name} ${count}/${Math.round(type.spawn.maxCount * this.scale)}`;
+    }).join('  ');
   }
 }

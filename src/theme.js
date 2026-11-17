@@ -78,10 +78,14 @@ export const THEME = {
     //   antialias:     smooth jagged edges. Only changes when the page is reloaded.
     //   mobScale:      how many creatures can be around at once, times each
     //                  creature's own limit in mobTypes.js (1 = the full amount)
+    //   glowLights:    how many glowing creatures (the nearest ones) really light
+    //                  up the blocks around them. Each one costs a little on every
+    //                  pixel of land, so lower levels use fewer. The soft glow
+    //                  around every glowing creature is always there.
     levels: {
-      high:   { pixelRatio: 2,   drawRadius: 5, haze: [45, 78], chunkBudgetMs: 4, starLayers: 2, galaxy: 'full',   clouds: 'full',   blackHole: 'full',   antialias: true,  mobScale: 1 },
-      medium: { pixelRatio: 1.5, drawRadius: 4, haze: [36, 62], chunkBudgetMs: 3, starLayers: 2, galaxy: 'simple', clouds: 'full',   blackHole: 'full',   antialias: true,  mobScale: 0.75 },
-      low:    { pixelRatio: 1,   drawRadius: 3, haze: [27, 46], chunkBudgetMs: 2, starLayers: 1, galaxy: 'simple', clouds: 'simple', blackHole: 'simple', antialias: false, mobScale: 0.5 },
+      high:   { pixelRatio: 2,   drawRadius: 5, haze: [45, 78], chunkBudgetMs: 4, starLayers: 2, galaxy: 'full',   clouds: 'full',   blackHole: 'full',   antialias: true,  mobScale: 1,    glowLights: 2 },
+      medium: { pixelRatio: 1.5, drawRadius: 4, haze: [36, 62], chunkBudgetMs: 3, starLayers: 2, galaxy: 'simple', clouds: 'full',   blackHole: 'full',   antialias: true,  mobScale: 0.75, glowLights: 1 },
+      low:    { pixelRatio: 1,   drawRadius: 3, haze: [27, 46], chunkBudgetMs: 2, starLayers: 1, galaxy: 'simple', clouds: 'simple', blackHole: 'simple', antialias: false, mobScale: 0.5,  glowLights: 0 },
     },
   },
 
@@ -196,6 +200,15 @@ export const THEME = {
       snout: '#c97a4e',
       stalks: '#6e3320',     // the stalks its eyes sit on
       eyes: '#141018',
+    },
+    glowCritter: {           // small, shy night creature with glowing antennae
+      body: '#3a3263',       // dusky violet fur
+      legs: '#221c3c',
+      antennae: '#3a3263',
+      eyes: '#0a0812',       // big dark eyes...
+      shine: '#e8fff8',      // ...with a tiny glint (glows)
+      glow: '#7ff5d8',       // antenna tips, belly and tail tip (these glow)
+      light: '#a6ece0',      // colour of the light it casts, its halo and the pool of light under it
     },
   },
 

@@ -76,7 +76,7 @@ export class GraphicsSettings {
     this.world.setDrawRadius(level.drawRadius, level.chunkBudgetMs);
     this.scene.fog.near = level.haze[0];
     this.scene.fog.far = level.haze[1];
-    this.mobs.setScale(level.mobScale);
+    this.mobs.setGraphics(level);
     if (sky) this.dayNight.setSkyDetail(level);
   }
 

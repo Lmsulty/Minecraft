@@ -5,6 +5,7 @@
 //   mob.speed     how fast it wants to walk (0 = stand still)
 //   mob.grazing   true = head down, eating
 //   mob.fleeing   true = running away (allowed to jump off bigger drops)
+//   mob.alert     true = head up, watching something
 // mobs.js does the rest: turning, walking, avoiding walls and cliffs,
 // hopping up steps, gravity.
 //
@@ -15,6 +16,8 @@
 //   onHit(mob, game, from)     the player hit it (from = where the hit came from)
 //
 // game = { mobs (every creature), player, random () => 0..1 }
+// mob.leaving is set by mobs.js when it's the wrong time of day for this
+// creature (e.g. dawn for a night creature): it should run off.
 //
 // Later, a hostile brain (e.g. 'hunter') would go here too: idle -> chase
 // the player when close -> attack when in reach -> give up when far.
@@ -88,15 +91,69 @@ export const BRAINS = {
       }
     },
   },
+
+  // ---- Shy: keeps its distance from the player, and runs if they come close ----
+  shy: {
+    start(mob, game) {
+      mob.goal = game.random() * Math.PI * 2;
+      pickNext(mob, game);
+    },
+
+    update(mob, game, dt) {
+      mob.timer -= dt;
+      const type = mob.type;
+      const p = game.player.position;
+      const distance = Math.hypot(p.x - mob.position.x, p.z - mob.position.z);
+
+      // Dawn (or too close): run away from the player.
+      const tooClose = mob.state === 'flee'
+        ? distance < type.safeDistance || mob.timer > 0 // keeps running until safe (and after a hit)
+        : distance < type.scaredDistance;
+      if (mob.leaving || tooClose) {
+        if (mob.state !== 'flee') startFleeing(mob, game, p, 0);
+        mob.fear.x = p.x;
+        mob.fear.z = p.z;
+        mob.dodgeTimer -= dt;
+        if (mob.dodgeTimer <= 0) mob.dodge = 0;
+        mob.goal = angleTowards(p.x, p.z, mob.position.x, mob.position.z) + mob.dodge;
+        return;
+      }
+
+      // Close enough to be curious: stop, turn to face the player, head up.
+      if (distance < type.watchDistance) {
+        if (mob.state !== 'watch') {
+          mob.state = 'watch';
+          mob.speed = 0;
+          mob.fleeing = false;
+          mob.alert = true;
+        }
+        mob.goal = angleTowards(mob.position.x, mob.position.z, p.x, p.z);
+        return;
+      }
+
+      // Otherwise it goes about its business.
+      if (mob.state === 'watch' || mob.state === 'flee' || mob.timer <= 0) pickNext(mob, game);
+    },
+
+    onBlocked(mob, game) {
+      BRAINS.herd.onBlocked(mob, game); // same: dodge sideways when fleeing, else turn
+    },
+
+    onHit(mob, game, from) {
+      startFleeing(mob, game, from);
+    },
+  },
 };
 
 // Choose what to do next: wander, graze or stand still.
 function pickNext(mob, game) {
   const type = mob.type;
-  const { wander, graze } = type.choices;
-  const roll = game.random() * (type.choices.wander + type.choices.graze + type.choices.idle);
+  const wander = type.choices.wander ?? 0;
+  const graze = type.choices.graze ?? 0;
+  const roll = game.random() * (wander + graze + (type.choices.idle ?? 0));
   mob.grazing = false;
   mob.fleeing = false;
+  mob.alert = false;
   if (roll < wander) {
     mob.state = 'wander';
     mob.timer = between(type.wanderTime, game.random);
@@ -114,9 +171,12 @@ function pickNext(mob, game) {
   }
 }
 
-function startFleeing(mob, game, from) {
+// Run away from `from`. `time` = how long to keep running at least
+// (default: the creature's fleeTime).
+function startFleeing(mob, game, from, time = between(mob.type.fleeTime, game.random)) {
   mob.state = 'flee';
-  mob.timer = between(mob.type.fleeTime, game.random);
+  mob.timer = time;
+  mob.alert = false;
   mob.speed = mob.type.fleeSpeed;
   mob.grazing = false;
   mob.fleeing = true;

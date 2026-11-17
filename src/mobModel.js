@@ -13,6 +13,10 @@ import { makeRandom } from './random.js';
 //
 // The material is bent like the land (curve.js), so creatures follow the
 // curved view and fade into the haze exactly like the blocks around them.
+//
+// Parts marked `glow: true` go in a second batch whose material ignores light
+// and darkness, so they shine at night (like the glow lamp block). Halos and
+// real lights around glowing creatures are in mobGlow.js.
 
 const FAR_ANIMATION = 40; // creatures further away than this don't move their legs (saves time)
 
@@ -34,7 +38,9 @@ function makeSpeckleTexture() {
 }
 
 const CUBE = new THREE.BoxGeometry(1, 1, 1);
-const MATERIAL = bendMaterial(new THREE.MeshLambertMaterial({ map: makeSpeckleTexture() }));
+const SPECKLE = makeSpeckleTexture();
+const MATERIAL = bendMaterial(new THREE.MeshLambertMaterial({ map: SPECKLE }));    // lit by the sun, moon and lights
+const GLOW_MATERIAL = bendMaterial(new THREE.MeshBasicMaterial({ map: SPECKLE })); // always fully bright
 const FLASH = new THREE.Color(THEME.mobs.hitFlash);
 
 // Scratch space, reused every frame (making new objects every frame would
@@ -70,21 +76,17 @@ export class MobRenderer {
       return new THREE.Color(palette[part.color]);
     });
 
-    this.mesh = new THREE.InstancedMesh(CUBE, MATERIAL, maxMobs * this.parts.length);
-    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // changes every frame
-    this.mesh.setColorAt(0, color.set(0xffffff)); // makes the per-copy colour list
-    this.mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-    this.mesh.count = 0;
-    // Off-screen checks don't work for one mesh spread over many creatures
-    // (and the curve moves things). It's a single draw call anyway.
-    this.mesh.frustumCulled = false;
-    scene.add(this.mesh);
+    // One batch for normal parts, and one for glowing parts (only if it has any).
+    const glowCount = this.parts.filter((part) => part.glow).length;
+    this.mesh = makeBatch(MATERIAL, maxMobs * (this.parts.length - glowCount), scene);
+    this.glowMesh = glowCount ? makeBatch(GLOW_MATERIAL, maxMobs * glowCount, scene) : null;
   }
 
   // Update the pose of every creature of this type and send it to the graphics card.
   draw(mobs, camera) {
     const parts = this.parts;
-    let i = 0;
+    let i = 0; // next free copy in the normal batch
+    let g = 0; // ...and in the glowing batch
     for (const mob of mobs) {
       if (mob.type !== this.type) continue;
       const near = Math.hypot(mob.position.x - camera.position.x, mob.position.z - camera.position.z) < FAR_ANIMATION;
@@ -115,19 +117,41 @@ export class MobRenderer {
           boneMatrix.makeTranslation(0, bob, 0);
         }
         partMatrix.premultiply(boneMatrix).premultiply(mobMatrix);
-        this.mesh.setMatrixAt(i, partMatrix);
 
-        // Colour: darker under cover, and flashing when hit.
-        color.copy(this.colors[p]).multiplyScalar(mob.shade);
+        // Colour: normal parts are darker under cover; glowing parts pulse
+        // gently (and fade when it leaves at dawn). Both flash when hit.
+        color.copy(this.colors[p]).multiplyScalar(part.glow ? mob.glow : mob.shade);
         if (mob.flash > 0) color.lerp(FLASH, mob.flash);
-        this.mesh.setColorAt(i, color);
-        i++;
+        const batch = part.glow ? this.glowMesh : this.mesh;
+        const index = part.glow ? g++ : i++;
+        batch.setMatrixAt(index, partMatrix);
+        batch.setColorAt(index, color);
       }
     }
-    this.mesh.count = i;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.mesh.instanceColor.needsUpdate = true;
+    finishBatch(this.mesh, i);
+    if (this.glowMesh) finishBatch(this.glowMesh, g);
   }
+}
+
+// One instanced mesh: up to `copies` boxes in a single draw call.
+function makeBatch(material, copies, scene) {
+  const mesh = new THREE.InstancedMesh(CUBE, material, copies);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); // changes every frame
+  mesh.setColorAt(0, color.set(0xffffff)); // makes the per-copy colour list
+  mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  mesh.count = 0;
+  // Off-screen checks don't work for one mesh spread over many creatures
+  // (and the curve moves things). It's a single draw call anyway.
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  return mesh;
+}
+
+// Draw only the first `count` copies, and send this frame's changes.
+function finishBatch(mesh, count) {
+  mesh.count = count;
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.instanceColor.needsUpdate = true;
 }
 
 // Move the animation along. `moved` = how far the creature walked this frame.
@@ -138,10 +162,17 @@ export function animateMob(mob, dt, moved) {
   mob.moving += (target - mob.moving) * Math.min(1, dt * 8);
   // Legs step in time with the distance actually walked, so feet don't slide.
   mob.walkPhase = (mob.walkPhase + (moved / type.stride) * Math.PI * 2) % (Math.PI * 2);
-  // Head down while grazing, with a little chewing nod.
+  // Head down while grazing, with a little chewing nod. Head up when alert.
   mob.chew += dt * 8;
-  const dip = mob.grazing ? type.head.grazeDip + Math.sin(mob.chew) * 0.06 : 0;
+  let dip = 0;
+  if (mob.grazing) dip = type.head.grazeDip + Math.sin(mob.chew) * 0.06;
+  else if (mob.alert) dip = -(type.head.alertLift ?? 0);
   mob.headDip += (dip - mob.headDip) * Math.min(1, dt * 4);
+  // Glowing parts pulse gently, and fade out as it leaves at dawn.
+  if (type.glow) {
+    mob.pulse += dt * type.glow.pulseSpeed;
+    mob.glow = (0.82 + 0.18 * Math.sin(mob.pulse)) * mob.glowFade;
+  }
   // Fade the hit flash out.
   mob.flash = Math.max(0, mob.flash - dt * 5);
 }
