@@ -21,4 +21,5 @@ export const RECIPES = [
   { makes: 'glass', count: 1, needs: { sand: 3 } },
   { makes: 'glow lamp', count: 1, needs: { planks: 2, 'stone bricks': 1, leaves: 4 } },
   { makes: 'glow lamp', count: 1, needs: { planks: 2, 'stone bricks': 1, 'glow dust': 1 } }, // glow dust instead of leaves
+  { makes: 'felt block', count: 1, needs: { 'grazer fleece': 2 } },
 ];

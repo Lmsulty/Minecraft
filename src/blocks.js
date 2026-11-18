@@ -16,6 +16,7 @@ export const BLOCK = {
   STONE_BRICKS: 9,
   GLOW_LAMP: 10,
   GLASS: 11,
+  FELT: 12,
 };
 
 // Indexed by block id.
@@ -83,6 +84,11 @@ export const BLOCK_TYPES = [
     // See-through: you can look through the middle of each face, and sunlight passes through.
     id: BLOCK.GLASS, name: 'glass', solid: true, opaque: false, renderType: 'cutout', blocksLight: false,
     textures: { top: 'glass', side: 'glass', bottom: 'glass' },
+  },
+  {
+    // Soft quilted panels, made from grazer fleece (see recipes.js).
+    id: BLOCK.FELT, name: 'felt block', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
+    textures: { top: 'felt', side: 'felt', bottom: 'felt' },
   },
 ];
 

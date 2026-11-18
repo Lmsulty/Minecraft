@@ -340,6 +340,37 @@ function paintGlass(t) {
   t.set(11, 11, C.glass.shine); // a small glint bottom-right
 }
 
+function paintFelt(t, rand) {
+  // Soft matted fleece, pressed into a panel with a ring of stitches.
+  // Side by side, the blocks look like a quilt.
+  const c = C.felt;
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, c.base));
+  }
+  // Fuzz: short, slanting fibres, some lighter and some darker.
+  for (let i = 0; i < 22; i++) {
+    const x = Math.floor(rand() * TILE);
+    const y = Math.floor(rand() * TILE);
+    const color = rand() < 0.5 ? c.fiberLight : c.fiberDark;
+    t.set(x, y, color);
+    t.set(x + (rand() < 0.5 ? -1 : 1), y + 1, color);
+  }
+  // Seam round the edge of the panel.
+  for (let i = 0; i < TILE; i++) {
+    t.set(i, 0, c.seam);
+    t.set(0, i, c.seam);
+    t.set(i, TILE - 1, c.seamShade);
+    t.set(TILE - 1, i, c.seamShade);
+  }
+  // Stitches: a dashed line two pixels in from the edge.
+  for (let i = 3; i <= TILE - 4; i += 2) {
+    t.set(i, 2, c.stitch);
+    t.set(i, TILE - 3, c.stitch);
+    t.set(2, i, c.stitch);
+    t.set(TILE - 3, i, c.stitch);
+  }
+}
+
 // ---- Atlas layout ----
 // Order here = position in the atlas (left to right, then next row).
 // Names must match the `textures` entries in blocks.js.
@@ -358,6 +389,7 @@ const PAINTERS = {
   stone_bricks: paintStoneBricks,
   glow_lamp: paintGlowLamp,
   glass: paintGlass,
+  felt: paintFelt,
 };
 const TILE_NAMES = Object.keys(PAINTERS);
 

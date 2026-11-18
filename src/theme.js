@@ -344,6 +344,14 @@ export const THEME = {
       frameShade: '#bcb39c',// bottom and right edges
       shine: '#fffaf0',     // streaks of reflection (the rest of the pane is see-through)
     },
+    felt: {                // pressed grazer fleece: soft rusty-orange quilted panels
+      base: ['#a9532b', '#b0592f', '#a4502a', '#b35c32'],
+      fiberLight: '#c3703f',// fuzzy fibres
+      fiberDark: '#8e4320',
+      seam: '#7a3517',      // top and left edges of each panel
+      seamShade: '#62290f', // bottom and right edges
+      stitch: '#ecc596',    // the ring of pale stitches
+    },
   },
 
   // ---- Interface (pause screen, FPS box, hotbar...) ----
