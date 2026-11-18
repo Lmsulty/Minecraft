@@ -1,5 +1,6 @@
 import { THEME } from './theme.js';
 import { BLOCK_TYPES } from './blocks.js';
+import { idByName } from './items.js';
 import { MOB_TYPES } from './mobTypes.js';
 import { BRAINS } from './mobBrains.js';
 import { MobRenderer, animateMob, modelBounds } from './mobModel.js';
@@ -35,6 +36,16 @@ function blockId(name, mobName) {
   return type.id;
 }
 
+// What a creature drops, with ids instead of names (stops with a clear
+// message if mobTypes.js has a typo).
+function dropList(type) {
+  return (type.drops ?? []).map(({ item, count }) => {
+    const id = idByName(item);
+    if (id === null) throw new Error(`mobTypes.js, ${type.name}: no item or block called "${item}"`);
+    return { id, count };
+  });
+}
+
 // Smallest difference between two angles, from -PI to PI.
 function angleDifference(a, b) {
   let d = (a - b) % (Math.PI * 2);
@@ -64,6 +75,7 @@ export class Mobs {
       return {
         type,
         groundId: blockId(type.spawn.ground, type.name),
+        drops: dropList(type),
         bounds: modelBounds(type),
         renderer: new MobRenderer(type, type.spawn.maxCount, scene),
       };
@@ -343,7 +355,7 @@ export class Mobs {
       blockedCooldown: 0,
       stuckTime: 0,
       dying: false,
-      defeated: false,    // true = the player beat it (it gets a drop later)
+      defeated: false,    // true = the player beat it (so it drops something)
       dyingTimer: 0,
       dyingLength: DYING_TIME,
       removed: false,
@@ -389,9 +401,12 @@ export class Mobs {
     return null;
   }
 
-  // The player hit `mob` from position `from`. Returns true if it counted.
+  // The player hit `mob` from position `from`. Returns what happened:
+  //   'missed'    it didn't count (already dying, or hit a moment ago)
+  //   'hit'       it took a hit
+  //   'defeated'  that was its last hit (see dropsFor for what it drops)
   hit(mob, from) {
-    if (mob.dying || mob.hitCooldown > 0) return false;
+    if (mob.dying || mob.hitCooldown > 0) return 'missed';
     const type = mob.type;
     mob.hitCooldown = HIT_COOLDOWN;
     mob.health--;
@@ -409,14 +424,24 @@ export class Mobs {
     mob.stun = STUN_TIME;
 
     if (mob.health <= 0) {
-      // Defeated: it shrinks away. (Drops come in a later step.)
+      // Defeated: it shrinks away.
       mob.dying = true;
       mob.defeated = true;
       mob.dyingTimer = DYING_TIME;
-      return true;
+      return 'defeated';
     }
     BRAINS[type.brain].onHit(mob, this.game, from);
-    return true;
+    return 'hit';
+  }
+
+  // What a defeated creature drops: [{ id, count }, ...], with the counts
+  // rolled at random from the ranges in mobTypes.js.
+  dropsFor(mob) {
+    const entry = this.types.find((e) => e.type === mob.type);
+    const random = this.game.random;
+    return entry.drops
+      .map(({ id, count: [least, most] }) => ({ id, count: least + Math.floor(random() * (most - least + 1)) }))
+      .filter((drop) => drop.count > 0);
   }
 
   // For the FPS box: how many of each creature are around / the most allowed,

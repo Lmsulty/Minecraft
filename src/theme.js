@@ -212,6 +212,24 @@ export const THEME = {
     },
   },
 
+  // ---- Item pictures (see itemIcons.js for the patterns) ----
+  // Lists like base: [...] are picked from at random, pixel by pixel.
+  items: {
+    grazerFleece: {          // a fluffy tuft, the same rusty orange as the grazer
+      base: ['#bf5f33', '#c9693b', '#b5562b', '#c46536'],
+      light: '#f0b07a',      // lit tops of the puffs
+      dark: '#7c3419',       // shadowed undersides and creases
+      outline: '#3a170b',
+    },
+    glowDust: {              // a little heap of glittering teal dust
+      base: ['#4fcfb4', '#5ad9be', '#46c1a8', '#62e0c6'],
+      light: '#a8fff0',
+      dark: '#2a8a7a',
+      sparkle: '#f2fffb',
+      outline: '#123d38',
+    },
+  },
+
   // ---- In the world ----
   blockOutline: '#000000', // box around the block you're aiming at
 

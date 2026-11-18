@@ -1,15 +1,15 @@
-import { BLOCK_TYPES } from './blocks.js';
+import { idByName } from './items.js';
 import { RECIPES } from './recipes.js';
 
-// Crafting rules: turns the recipes in recipes.js (written with block names)
-// into block ids, and works out whether each one can be crafted right now.
-// Drawing the recipe list is done by craftingPanel.js.
+// Crafting rules: turns the recipes in recipes.js (written with block and
+// item names) into ids, and works out whether each one can be crafted right
+// now. Drawing the recipe list is done by craftingPanel.js.
 
 // 'planks' -> 7. Stops the game with a clear message if a recipe has a typo.
 function blockIdByName(name, recipeIndex) {
-  const type = BLOCK_TYPES.find((t) => t.name === name);
-  if (!type) throw new Error(`recipes.js, recipe ${recipeIndex + 1}: no block called "${name}"`);
-  return type.id;
+  const id = idByName(name);
+  if (id === null) throw new Error(`recipes.js, recipe ${recipeIndex + 1}: no block or item called "${name}"`);
+  return id;
 }
 
 // The recipes with block ids instead of names:

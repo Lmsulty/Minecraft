@@ -44,6 +44,11 @@ export const MOB_TYPES = {
       stayWithin: 6,           // wanders back if it gets further than this from its herd
       maxDrop: 3,              // won't walk off a drop higher than this (unless fleeing)
 
+      // ---- What you get for defeating it ----
+      // item: an item or block name (items.js / blocks.js)
+      // count: [least, most], a whole number between them (both included)
+      drops: [{ item: 'grazer fleece', count: [1, 2] }],
+
       // ---- Spawning ----
       spawn: {
         ground: 'grass',       // block name it must stand on (blocks.js)
@@ -118,6 +123,8 @@ export const MOB_TYPES = {
       herdSize: [1, 2],        // alone or in pairs
       herdSpread: 2,
       leaveTime: 4,            // at dawn it runs off for this long, then vanishes
+
+      drops: [{ item: 'glow dust', count: [1, 1] }], // not when it leaves at dawn: only if you catch it
 
       // ---- Spawning ----
       spawn: {

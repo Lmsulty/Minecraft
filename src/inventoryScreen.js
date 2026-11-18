@@ -1,6 +1,7 @@
 import './inventory.css';
-import { BLOCK_TYPES, isBreakableId, blockDisplayName } from './blocks.js';
-import { getBlockIconURL } from './blockIcons.js';
+import { BLOCK_TYPES, isBreakableId } from './blocks.js';
+import { ITEM_TYPES, displayName } from './items.js';
+import { getIconURL } from './blockIcons.js';
 import { HOTBAR_SIZE, INVENTORY_SIZE, MAX_STACK } from './inventory.js';
 import { CraftingPanel } from './craftingPanel.js';
 
@@ -11,7 +12,7 @@ import { CraftingPanel } from './craftingPanel.js';
 //   Shift + click     send a stack between the hotbar and the backpack
 //
 // On the right: the crafting list in normal mode (see craftingPanel.js).
-// In creative mode a palette of every block is shown there instead:
+// In creative mode a palette of every block and item is shown there instead:
 // click one to pick up a full stack. Clicking the palette while holding
 // something throws the held stack away.
 //
@@ -72,7 +73,7 @@ export class InventoryScreen {
           <div class="recipe-list"></div>
         </div>
         <div class="inv-side inv-creative">
-          <h2 class="inv-title">All blocks</h2>
+          <h2 class="inv-title">All blocks and items</h2>
           <p class="inv-hint">Click to take a stack.<br>Click while holding to discard.</p>
           <div class="inv-grid inv-palette"></div>
         </div>
@@ -91,16 +92,20 @@ export class InventoryScreen {
       this.slotElements.push(el);
     }
 
-    // Creative palette: every block you could place (not air, not core rock).
+    // Creative palette: every block you could place (not air, not core rock),
+    // then every item.
     this.creativeSide = this.root.querySelector('.inv-creative');
     this.craftingSide = this.root.querySelector('.inv-crafting');
     this.craftingPanel = new CraftingPanel(this.root.querySelector('.recipe-list'), this.inventory);
     const palette = this.root.querySelector('.inv-palette');
-    for (const type of BLOCK_TYPES) {
-      if (!type.textures || !isBreakableId(type.id)) continue;
+    const paletteIds = [
+      ...BLOCK_TYPES.filter((type) => type.textures && isBreakableId(type.id)).map((type) => type.id),
+      ...ITEM_TYPES.map((item) => item.id),
+    ];
+    for (const id of paletteIds) {
       const el = this.makeSlot();
-      this.drawStack(el, { block: type.id, count: 0 });
-      el.addEventListener('mousedown', (e) => this.onPaletteClick(type.id, e));
+      this.drawStack(el, { block: id, count: 0 });
+      el.addEventListener('mousedown', (e) => this.onPaletteClick(id, e));
       palette.appendChild(el);
     }
 
@@ -129,11 +134,11 @@ export class InventoryScreen {
     const img = el.querySelector('.inv-icon');
     const count = el.querySelector('.inv-count');
     if (stack) {
-      const src = getBlockIconURL(stack.block);
+      const src = getIconURL(stack.block);
       if (img.getAttribute('src') !== src) img.src = src;
       img.style.visibility = 'visible';
       count.textContent = stack.count > 1 ? stack.count : '';
-      el.title = blockDisplayName(stack.block);
+      el.title = displayName(stack.block);
     } else {
       img.style.visibility = 'hidden';
       count.textContent = '';

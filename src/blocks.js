@@ -1,4 +1,5 @@
-// Every block type in the game lives here.
+// Every block type in the game lives here. (Things you carry but can't
+// place, like grazer fleece, are items: see items.js.)
 // The world stores only the number (id) of each block; this file says what each number means.
 
 export const BLOCK = {
@@ -104,10 +105,4 @@ export function isBreakableId(id) {
 // The block you collect when you break block `id`.
 export function dropId(id) {
   return BLOCK_TYPES[id]?.drops ?? id;
-}
-
-// A block's name for showing on screen: 'planks' -> 'Planks'.
-export function blockDisplayName(id) {
-  const name = BLOCK_TYPES[id].name;
-  return name[0].toUpperCase() + name.slice(1);
 }

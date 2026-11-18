@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BLOCK, isBreakableId, dropId } from './blocks.js';
+import { isPlaceableId, displayName } from './items.js';
 import { THEME } from './theme.js';
 import { bendMaterial, unbendPoint } from './curve.js';
 
@@ -8,6 +9,8 @@ import { bendMaterial, unbendPoint } from './curve.js';
 // Left click also hits creatures (mobs.js), if one is closer than the block.
 // Which block gets placed comes from the hotbar (hotbar.js).
 // Broken blocks go into the inventory; placing a block uses one up.
+// Defeated creatures' drops go straight into the inventory too.
+// Items (items.js) can be held, but right click doesn't place them.
 
 const REACH = 5; // how far away (in blocks) you can break/place
 
@@ -58,7 +61,7 @@ export class Interaction {
     // A creature in the way, closer than the block (or with no block in reach)?
     const mob = this.mobInSight(hit ? hit.t : REACH);
     if (mob) {
-      this.mobs.hit(mob, this.player.position);
+      if (this.mobs.hit(mob, this.player.position) === 'defeated') this.collectDrops(mob);
       return;
     }
     if (!hit) return;
@@ -70,9 +73,26 @@ export class Interaction {
     if (!this.inventory.creative) this.inventory.add(dropId(blockId));
   }
 
+  // Put a defeated creature's drops in the inventory, and say so above the
+  // hotbar ("+2 Grazer fleece"). Like breaking blocks: nothing is collected in
+  // creative mode, and whatever doesn't fit in a full inventory is lost.
+  collectDrops(mob) {
+    if (this.inventory.creative) return;
+    const got = [];
+    let lost = false;
+    for (const { id, count } of this.mobs.dropsFor(mob)) {
+      const added = this.inventory.add(id, count);
+      if (added > 0) got.push(`+${added} ${displayName(id)}`);
+      if (added < count) lost = true;
+    }
+    if (lost) got.push('Inventory full');
+    if (got.length) this.hotbar.showText(got.join('   '));
+  }
+
   placeBlock() {
     const blockId = this.hotbar.selectedBlock;
-    if (blockId === null) return; // empty hotbar slot: nothing to place
+    if (blockId === null) return;         // empty hotbar slot: nothing to place
+    if (!isPlaceableId(blockId)) return;  // an item, like fleece: can't be placed
     const hit = this.raycast();
     if (!hit) return;
     // The new block goes in the space touching the face we're aiming at.

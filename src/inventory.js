@@ -1,4 +1,4 @@
-import { BLOCK_TYPES } from './blocks.js';
+import { isCarryableId } from './items.js';
 
 // Everything the player is carrying. This file only holds the DATA
 // (which block is in which slot, and how many). Drawing it on screen is
@@ -6,6 +6,8 @@ import { BLOCK_TYPES } from './blocks.js';
 //
 // Slots 0-8 are the hotbar. Slots 9-35 are the backpack (shown on the
 // inventory screen). Each slot is either null (empty) or { block, count }.
+// `block` can also be an item id (items.js): items stack and move around
+// exactly like blocks; they just can't be placed in the world.
 //
 // `held` is the stack stuck to your mouse pointer while you move things
 // around on the inventory screen (null = nothing held).
@@ -288,10 +290,10 @@ export class Inventory {
     }
     if (!saved) return;
 
-    // Only keep stacks that still make sense (e.g. a block that was removed
-    // from blocks.js, or a broken save, is skipped instead of crashing).
+    // Only keep stacks that still make sense (e.g. a block or item that was
+    // removed from the game, or a broken save, is skipped instead of crashing).
     const isValid = (stack) =>
-      stack && BLOCK_TYPES[stack.block]?.textures &&
+      stack && isCarryableId(stack.block) &&
       Number.isInteger(stack.count) && stack.count > 0;
 
     (saved.slots ?? []).forEach((stack, i) => {

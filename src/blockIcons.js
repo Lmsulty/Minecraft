@@ -1,7 +1,11 @@
 import { BLOCK_TYPES } from './blocks.js';
 import { paintTile } from './textures.js';
+import { itemType } from './items.js';
+import { paintItem, ITEM_ICON_SIZE } from './itemIcons.js';
 
-// Draws a small 3D-looking cube icon for a block, using the same pixel-art
+// Icons for the hotbar, inventory and crafting list.
+// Items (items.js) are a flat pixel-art picture from itemIcons.js, made bigger.
+// Blocks are a small 3D-looking cube, using the same pixel-art
 // tiles as the world. The cube is seen from slightly above: its top face plus
 // two side faces, each drawn as a slanted (skewed) copy of the 16 x 16 tile.
 //
@@ -55,13 +59,24 @@ function drawFace(ctx, tileName, transform, darkness) {
   }
 }
 
-// Returns a <canvas> with the block's icon on it.
-export function makeBlockIcon(blockId) {
+// Returns a <canvas> with the icon of a block or item on it.
+export function makeIcon(blockId) {
   const canvas = document.createElement('canvas');
   canvas.width = ICON_SIZE;
   canvas.height = ICON_SIZE;
   const ctx = canvas.getContext('2d');
   ctx.imageSmoothingEnabled = false; // keep the pixel art crisp
+
+  const item = itemType(blockId);
+  if (item) {
+    // Draw the small picture, then copy it up to full icon size (chunky pixels).
+    const small = document.createElement('canvas');
+    small.width = ITEM_ICON_SIZE;
+    small.height = ITEM_ICON_SIZE;
+    small.getContext('2d').putImageData(new ImageData(paintItem(item.icon), ITEM_ICON_SIZE, ITEM_ICON_SIZE), 0, 0);
+    ctx.drawImage(small, 0, 0, ICON_SIZE, ICON_SIZE);
+    return canvas;
+  }
 
   const textures = BLOCK_TYPES[blockId]?.textures;
   if (!textures) return canvas; // nothing to draw (e.g. air)
@@ -80,10 +95,10 @@ export function makeBlockIcon(blockId) {
   return canvas;
 }
 
-// The same icon as a picture URL, for <img> tags. Made once per block and reused,
-// so redrawing the inventory screen doesn't repaint every icon.
+// The same icon as a picture URL, for <img> tags. Made once per block or item
+// and reused, so redrawing the inventory screen doesn't repaint every icon.
 const iconURLs = new Map();
-export function getBlockIconURL(blockId) {
-  if (!iconURLs.has(blockId)) iconURLs.set(blockId, makeBlockIcon(blockId).toDataURL());
+export function getIconURL(blockId) {
+  if (!iconURLs.has(blockId)) iconURLs.set(blockId, makeIcon(blockId).toDataURL());
   return iconURLs.get(blockId);
 }

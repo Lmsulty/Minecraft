@@ -1,5 +1,5 @@
-import { blockDisplayName } from './blocks.js';
-import { getBlockIconURL } from './blockIcons.js';
+import { displayName } from './items.js';
+import { getIconURL } from './blockIcons.js';
 import { CRAFTING_RECIPES, recipeStatus, craft } from './crafting.js';
 
 // The recipe list on the right of the inventory screen (normal mode only).
@@ -43,7 +43,7 @@ export class CraftingPanel {
 
     const icon = document.createElement('img');
     icon.className = 'recipe-icon';
-    icon.src = getBlockIconURL(recipe.makes);
+    icon.src = getIconURL(recipe.makes);
     icon.alt = '';
 
     const info = document.createElement('div');
@@ -51,7 +51,7 @@ export class CraftingPanel {
 
     const title = document.createElement('div');
     title.className = 'recipe-name';
-    title.textContent = `${blockDisplayName(recipe.makes)} ×${recipe.count}`;
+    title.textContent = `${displayName(recipe.makes)} ×${recipe.count}`;
     info.appendChild(title);
 
     // One line per ingredient: "Wood  1 / 1" (have / need).
@@ -60,7 +60,7 @@ export class CraftingPanel {
       const line = document.createElement('div');
       line.className = 'recipe-need';
       line.classList.toggle('is-missing', have < need.count);
-      line.textContent = `${blockDisplayName(need.block)}  ${have} / ${need.count}`;
+      line.textContent = `${displayName(need.block)}  ${have} / ${need.count}`;
       info.appendChild(line);
     }
 

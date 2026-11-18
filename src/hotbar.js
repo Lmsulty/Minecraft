@@ -1,6 +1,6 @@
 import './hotbar.css';
-import { blockDisplayName } from './blocks.js';
-import { makeBlockIcon } from './blockIcons.js';
+import { displayName } from './items.js';
+import { makeIcon } from './blockIcons.js';
 import { HOTBAR_SIZE } from './inventory.js';
 
 // The row of 9 block slots at the bottom of the screen.
@@ -16,7 +16,7 @@ const WHEEL_STEP = 50;         // scroll amount needed to move one slot
 const WHEEL_COOLDOWN_MS = 90;  // ignore scrolling for this long after moving
 const WHEEL_RESET_MS = 200;    // forget a half-finished scroll after this long
 
-const NAME_SHOW_MS = 1500;     // how long the block name stays up after switching
+const NAME_SHOW_MS = 1500;     // how long the block name (or a message) stays up
 
 export class Hotbar {
   // container: the empty <div> to build the hotbar in
@@ -43,7 +43,7 @@ export class Hotbar {
     return this.inventory.selected;
   }
 
-  // The block id in the selected slot, or null if that slot is empty.
+  // The block (or item) id in the selected slot, or null if that slot is empty.
   get selectedBlock() {
     return this.inventory.selectedStack?.block ?? null;
   }
@@ -86,7 +86,7 @@ export class Hotbar {
         el.icon?.remove();
         el.icon = null;
         if (blockId !== null) {
-          el.icon = makeBlockIcon(blockId);
+          el.icon = makeIcon(blockId);
           el.icon.className = 'hotbar-icon';
           el.slot.prepend(el.icon);
         }
@@ -111,7 +111,13 @@ export class Hotbar {
 
   showName() {
     const id = this.selectedBlock;
-    this.nameElement.textContent = id === null ? 'Empty' : blockDisplayName(id);
+    this.showText(id === null ? 'Empty' : displayName(id));
+  }
+
+  // Show a short message just above the hotbar for a moment
+  // (e.g. "+2 Grazer fleece" when you collect a drop).
+  showText(text) {
+    this.nameElement.textContent = text;
     this.nameElement.classList.add('is-visible');
     clearTimeout(this.nameTimer);
     this.nameTimer = setTimeout(() => this.nameElement.classList.remove('is-visible'), NAME_SHOW_MS);
