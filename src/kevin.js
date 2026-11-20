@@ -72,6 +72,7 @@ const STREAK_TIME = 5;        // hits closer together than this count as a strea
 const SHADE_EVERY = 0.5;      // seconds between "is there open sky above me?" checks
 const FAR_ANIMATION = 40;     // same as mobModel.js: no bobbing further away than this
 const TAG_HEIGHT = 2.45;      // the name tag floats this high above his feet (just over the antenna)
+const ANTENNA_BLINK = 6;      // times a second the antenna tip blinks while he talks
 
 // ---- Looks ----
 // Same format as the creatures in mobTypes.js. Colours: THEME.mobs.kevin.
@@ -122,7 +123,6 @@ const position = new THREE.Vector3();
 const turn = new THREE.Quaternion();
 const ONE = new THREE.Vector3(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
-const tagPoint = new THREE.Vector3();
 
 export class Kevin {
   constructor(scene, world, player, camera, tagElement) {
@@ -162,7 +162,10 @@ export class Kevin {
     };
 
     this.mode = 'idle';       // 'idle', 'follow' or 'backoff'
-    this.mood = 'idle';       // face to show: 'idle', 'talking' or 'thinking' (annoyed wins over these)
+    this.mood = 'idle';       // face to show: 'idle' or 'thinking' (talking and annoyed win over these)
+    this.talking = false;     // set by kevinTalk.js while he's saying something
+    this.clock = 0;           // seconds since the game started (for the antenna blink)
+    this.headPoint = new THREE.Vector3(); // just above his head: where the name tag and speech bubble go
     this.lookTimer = 0;       // idle: seconds until he glances somewhere else
     this.lookOffset = 0;      // idle: how far from straight at you he's looking
     this.detour = 0;          // side-step angle while getting round something
@@ -181,6 +184,14 @@ export class Kevin {
     this.shuffleTimer = 0;    // > 0 while he's shuffling out of the way
 
     this.teleport(); // start next to the player
+    this.events = [];  // things that happened, for kevinTalk.js: 'hit', 'teleport' (not the first arrival)
+  }
+
+  // What's happened since last asked (and forget them).
+  takeEvents() {
+    const events = this.events;
+    this.events = [];
+    return events;
   }
 
   // ---- Every frame ----
@@ -445,6 +456,7 @@ export class Kevin {
     b.stun = 0;
     b.yaw = b.goal = angleTowards(spot.x, spot.z, p.x, p.z);
     b.flash = 0.8; // a little flash as he beams in
+    this.events?.push('teleport');
     this.mode = 'idle';
     this.stuckTime = 0;
     this.progressTime = 0;
@@ -512,6 +524,7 @@ export class Kevin {
     this.annoyedTimer = ANNOYED_TIME;
     this.hitStreak = this.streakTimer > 0 ? this.hitStreak + 1 : 1;
     this.streakTimer = STREAK_TIME;
+    this.events.push('hit');
     return true;
   }
 
@@ -519,6 +532,9 @@ export class Kevin {
 
   draw(dt) {
     const b = this.body;
+    // The antenna tip blinks while he talks.
+    this.clock += dt;
+    b.glow = this.talking && Math.sin(this.clock * ANTENNA_BLINK * Math.PI * 2) < 0 ? 0.3 : 1;
     this.renderer.draw([b], this.camera);
 
     // The face panel sits in front of his head, and bobs with his body
@@ -532,9 +548,10 @@ export class Kevin {
     screenMatrix.makeScale(SCREEN.width, SCREEN.height, 1)
       .setPosition(SCREEN.at[0], SCREEN.at[1] + bob, SCREEN.at[2])
       .premultiply(bodyMatrix);
-    this.face.update(dt, this.annoyedTimer > 0 ? 'annoyed' : this.mood, screenMatrix);
+    const expression = this.annoyedTimer > 0 ? 'annoyed' : this.talking ? 'talking' : this.mood;
+    this.face.update(dt, expression, screenMatrix);
 
-    tagPoint.set(b.position.x, b.position.y + TAG_HEIGHT + bob, b.position.z);
-    this.tag.update(tagPoint, this.camera);
+    this.headPoint.set(b.position.x, b.position.y + TAG_HEIGHT + bob, b.position.z);
+    this.tag.update(this.headPoint, this.camera);
   }
 }

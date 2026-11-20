@@ -47,6 +47,7 @@ export class Player {
     this.savedLook = null; // where you were looking when a menu opened (put back afterwards)
     this.ignoreMouseUntil = 0; // see SETTLE_TIME_MS
     this.spawnPoint = { x: 0, y: 0, z: 0 };
+    this.falls = 0; // times you've fallen out of the world (Kevin comments on it)
 
     this.setupControls();
   }
@@ -182,6 +183,7 @@ export class Player {
 
     // Fell out of the bottom of the world? Back to the start.
     if (this.position.y < -30) {
+      this.falls++;
       this.spawn(this.spawnPoint.x, this.spawnPoint.y, this.spawnPoint.z);
     }
 

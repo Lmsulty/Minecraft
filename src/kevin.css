@@ -54,3 +54,95 @@
 #kevin-rename small {
   opacity: 0.7;
 }
+
+/* Kevin's speech bubble (kevinBubble.js). It sits just above the name tag. */
+#kevin-bubble {
+  position: fixed;
+  left: 0;
+  top: -30px; /* lift it above the name tag */
+  display: none;
+  width: max-content;
+  max-width: 260px;
+  padding: 6px 10px;
+  background: var(--kevin-bubble-bg);
+  border: 1px solid var(--kevin-bubble-border);
+  border-radius: 8px;
+  color: var(--kevin-bubble-text);
+  font: 14px/1.35 system-ui, sans-serif;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+  z-index: 0;
+}
+
+#kevin-bubble.is-visible {
+  opacity: 1;
+}
+
+/* The little point under the bubble */
+#kevin-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  transform: translateX(-50%);
+  border: 7px solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--kevin-bubble-bg);
+}
+
+.kevin-bubble-name {
+  color: var(--kevin-bubble-name);
+  font: bold 11px monospace;
+  margin-bottom: 2px;
+}
+
+/* "Robot voice: On/Off" button on the pause screen (kevinVoice.js) */
+#kevin-voice {
+  margin-top: 8px;
+  padding: 6px 12px;
+  font: 14px system-ui, sans-serif;
+  color: var(--text);
+  background: var(--choice-bg);
+  border: 1px solid var(--button-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#kevin-voice:hover {
+  background: var(--choice-bg-hover);
+}
+
+#kevin-voice.selected {
+  background: var(--choice-selected-bg);
+  color: var(--choice-selected-text);
+}
+
+/* Caption at the bottom of the screen when his bubble can't be seen
+   (kevinCaption.js). Sits above the hotbar and its item name. */
+#kevin-caption {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--hotbar-bottom) + var(--hotbar-slot-size) + 52px);
+  transform: translateX(-50%);
+  max-width: min(640px, 90vw);
+  padding: 6px 14px;
+  background: var(--kevin-caption-bg);
+  border-radius: 4px;
+  color: var(--kevin-caption-text);
+  font: 15px/1.35 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s; /* fades out gently */
+  z-index: 1;
+}
+
+#kevin-caption.is-visible {
+  opacity: 1;
+}
+
+.kevin-caption-name {
+  color: var(--kevin-caption-name);
+  font-weight: bold;
+}

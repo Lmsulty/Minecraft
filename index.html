@@ -154,6 +154,8 @@
   </head>
   <body>
     <div id="kevin-tag"></div>
+    <div id="kevin-bubble"></div>
+    <div id="kevin-caption"></div>
     <div id="crosshair">+</div>
     <div id="hotbar"></div>
     <div id="fps"></div>
@@ -167,7 +169,7 @@
       <p>WASD move · Mouse look · Space jump · Esc pause · T speed up time · C creative mode · B curved view</p>
       <p>E or Tab inventory · Shift-click moves a stack · Right click splits</p>
       <p>Left click break · Right click place · 1–9 or scroll to pick block</p>
-      <p>Look at your robot and press N to rename him</p>
+      <p>Look at your robot and press N to rename him · M mutes his voice</p>
       <p>Broken blocks go in your hotbar. Placing a block uses one up.</p>
       <p>Your changes and inventory save automatically.</p>
       <div id="graphics">
@@ -177,6 +179,7 @@
         <button type="button" data-choice="medium">Medium</button>
         <button type="button" data-choice="high">High</button>
       </div>
+      <button id="kevin-voice" type="button"></button>
       <button id="reset" type="button">Reset world</button>
     </div>
     <script type="module" src="/src/main.js"></script>

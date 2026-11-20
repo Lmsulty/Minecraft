@@ -421,6 +421,13 @@ export const THEME = {
     '--kevin-tag-bg': 'rgba(0, 0, 0, 0.5)',       // dark behind the text, so it reads by day and night
     '--kevin-tag-border': 'rgba(138, 255, 208, 0.55)', // a hint of his screen green
     '--kevin-tag-shadow': '1px 1px 0 #000000',
+    '--kevin-bubble-bg': 'rgba(12, 20, 24, 0.85)', // Kevin's speech bubble
+    '--kevin-bubble-text': '#ffffff',
+    '--kevin-bubble-name': '#8affd0',             // his name on top of the bubble (screen green)
+    '--kevin-bubble-border': 'rgba(138, 255, 208, 0.45)',
+    '--kevin-caption-bg': 'rgba(0, 0, 0, 0.6)',  // his line at the bottom of the screen when he's out of sight
+    '--kevin-caption-text': '#ffffff',
+    '--kevin-caption-name': '#8affd0',
     '--kevin-rename-bg': 'rgba(24, 26, 32, 0.92)', // the "Rename your robot" box (press N)
     '--kevin-rename-border': 'rgba(138, 255, 208, 0.45)',
     '--kevin-rename-input-bg': 'rgba(255, 255, 255, 0.08)',

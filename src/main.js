@@ -17,6 +17,10 @@ import { GraphicsSettings } from './graphics.js';
 import { Mobs } from './mobs.js';
 import { Kevin } from './kevin.js';
 import { RenameBox, resetKevinName } from './kevinName.js';
+import { KevinVoice } from './kevinVoice.js';
+import { KevinBubble } from './kevinBubble.js';
+import { KevinCaption } from './kevinCaption.js';
+import { KevinTalk } from './kevinTalk.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
@@ -115,6 +119,12 @@ const interaction = new Interaction(camera, world, player, scene, hotbar, invent
 // ---- Renaming Kevin: look at him and press N (kevinName.js) ----
 new RenameBox(document.getElementById('kevin-rename'), player, () => interaction.lookingAtKevin);
 
+// ---- Kevin talking: speech bubble, captions, voice (M to mute) and remarks (kevinTalk.js) ----
+const kevinVoice = new KevinVoice(document.getElementById('kevin-voice'), (text) => hotbar.showText(text));
+const kevinTalk = new KevinTalk(kevin, player, dayNight, camera,
+  new KevinBubble(document.getElementById('kevin-bubble')),
+  new KevinCaption(document.getElementById('kevin-caption')), kevinVoice);
+
 // ---- Creative mode: press C for unlimited blocks ----
 // ---- Inventory screen: press E or Tab ----
 const inventoryScreen = new InventoryScreen(document.getElementById('inventory'), inventory, player);
@@ -162,6 +172,7 @@ function loop(now) {
   player.update(dt);
   mobs.update(dt);     // after the player moves, so they react to where you are now
   kevin.update(dt);    // same for Kevin
+  kevinTalk.update(dt); // after Kevin moves, so his speech bubble follows him
   interaction.update();
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera
   updateCurve(camera);                   // the cylinder bend starts at the camera
