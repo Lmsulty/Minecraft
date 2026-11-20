@@ -18,12 +18,14 @@ const REACH = 5; // how far away (in blocks) you can break/place
 const RAY_STEP = 0.05;   // blocks between checks
 const REFINE_STEPS = 12; // extra checks to find exactly where the ray enters a block
 const MOB_STEP = 0.1;    // blocks between checks when looking for a creature
+const KEVIN_LOOK_REACH = 8; // how far away you can look at Kevin to rename him (N)
 
 export class Interaction {
   constructor(camera, world, player, scene, hotbar, inventory, mobs, kevin) {
     this.camera = camera;
     this.mobs = mobs;
     this.kevin = kevin; // the robot companion (kevin.js): can be hit, but never defeated
+    this.lookingAtKevin = false; // is Kevin under the crosshair? (for renaming him with N)
     this.world = world;
     this.player = player;
     this.hotbar = hotbar;
@@ -113,10 +115,31 @@ export class Interaction {
   }
 
   // Called every frame: move the outline to whatever we're looking at.
+  // Also tells Kevin which block you're aiming at, so he can get out of the way.
   update() {
     const hit = this.player.locked ? this.raycast() : null;
     this.outline.visible = !!hit;
     if (hit) this.outline.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+
+    if (this.kevin) {
+      // How far along the line of sight Kevin is (null = not in it).
+      const kevinT = this.player.locked ? this.kevinInSight(KEVIN_LOOK_REACH) : null;
+      // You can see him if no block is in front of him.
+      this.lookingAtKevin = kevinT !== null && (!hit || kevinT < hit.t);
+      this.kevin.setAim(hit ? { x: hit.x, y: hit.y, z: hit.z, blocking: this.lookingAtKevin } : null);
+    }
+  }
+
+  // How far along the line of sight Kevin is (up to `maxT` blocks), or null
+  // if he isn't in it. Works in the curved view, like mobInSight().
+  kevinInSight(maxT) {
+    const origin = this.camera.position;
+    const dir = this.camera.getWorldDirection(this.direction);
+    for (let t = MOB_STEP; t <= maxT; t += MOB_STEP) {
+      this.drawnPoint.copy(origin).addScaledVector(dir, t);
+      if (this.kevin.isAt(unbendPoint(this.drawnPoint, origin.x, this.flatPoint))) return t;
+    }
+    return null;
   }
 
   // Find the first solid block along the line of sight, within reach, plus

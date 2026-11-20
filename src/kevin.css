@@ -1,0 +1,56 @@
+/* Kevin's name tag (kevinTag.js) and the rename box (kevinName.js).
+   Colours come from src/theme.js (THEME.ui). */
+
+#kevin-tag {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: none;
+  padding: 2px 8px;
+  background: var(--kevin-tag-bg);
+  border: 1px solid var(--kevin-tag-border);
+  border-radius: 4px;
+  color: var(--kevin-tag-text);
+  font: bold 14px/1.3 monospace;
+  text-shadow: var(--kevin-tag-shadow);
+  white-space: nowrap;
+  pointer-events: none;
+  transform-origin: 50% 100%; /* shrinks towards his head */
+  z-index: 0;
+}
+
+#kevin-rename {
+  position: fixed;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--kevin-rename-bg);
+  border: 1px solid var(--kevin-rename-border);
+  border-radius: 6px;
+  color: var(--text);
+  font: 14px system-ui, sans-serif;
+  z-index: 10;
+}
+
+#kevin-rename.is-open {
+  display: flex;
+}
+
+#kevin-rename input {
+  width: 220px;
+  padding: 6px 8px;
+  background: var(--kevin-rename-input-bg);
+  border: 1px solid var(--kevin-rename-border);
+  border-radius: 4px;
+  color: var(--text);
+  font: bold 16px monospace;
+  outline: none;
+}
+
+#kevin-rename small {
+  opacity: 0.7;
+}

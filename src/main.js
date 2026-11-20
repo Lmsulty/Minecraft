@@ -16,6 +16,7 @@ import { updateCurve, cullBentChunks } from './curve.js';
 import { GraphicsSettings } from './graphics.js';
 import { Mobs } from './mobs.js';
 import { Kevin } from './kevin.js';
+import { RenameBox, resetKevinName } from './kevinName.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
@@ -104,12 +105,15 @@ function findSpawn(x, z) {
 const mobs = new Mobs(scene, world, player, camera, dayNight);
 
 // ---- Kevin, your robot companion: follows you everywhere (kevin.js) ----
-const kevin = new Kevin(scene, world, player, camera);
+const kevin = new Kevin(scene, world, player, camera, document.getElementById('kevin-tag'));
 
 // ---- Breaking and placing blocks (and hitting creatures) ----
 // The hotbar's scroll wheel only works while playing (mouse captured).
 const hotbar = new Hotbar(document.getElementById('hotbar'), inventory, () => player.locked);
 const interaction = new Interaction(camera, world, player, scene, hotbar, inventory, mobs, kevin);
+
+// ---- Renaming Kevin: look at him and press N (kevinName.js) ----
+new RenameBox(document.getElementById('kevin-rename'), player, () => interaction.lookingAtKevin);
 
 // ---- Creative mode: press C for unlimited blocks ----
 // ---- Inventory screen: press E or Tab ----
@@ -135,6 +139,7 @@ document.getElementById('reset').addEventListener('click', (e) => {
   if (!confirm('Reset the world? All your changes and your inventory will be lost.')) return;
   editStore.clear();
   inventory.clear();
+  resetKevinName(); // back to "Kevin"
   location.reload(); // start fresh: the world regenerates from the seed
 });
 

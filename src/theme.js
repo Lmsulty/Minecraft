@@ -416,6 +416,14 @@ export const THEME = {
     '--recipe-ready-border': 'rgba(140, 220, 140, 0.6)',
     '--recipe-hover-bg': 'rgba(120, 200, 120, 0.28)',
     '--recipe-missing-text': '#ff8a7a',           // ingredient you don't have enough of
+
+    '--kevin-tag-text': '#ffffff',                // Kevin's floating name tag
+    '--kevin-tag-bg': 'rgba(0, 0, 0, 0.5)',       // dark behind the text, so it reads by day and night
+    '--kevin-tag-border': 'rgba(138, 255, 208, 0.55)', // a hint of his screen green
+    '--kevin-tag-shadow': '1px 1px 0 #000000',
+    '--kevin-rename-bg': 'rgba(24, 26, 32, 0.92)', // the "Rename your robot" box (press N)
+    '--kevin-rename-border': 'rgba(138, 255, 208, 0.45)',
+    '--kevin-rename-input-bg': 'rgba(255, 255, 255, 0.08)',
   },
 };
 

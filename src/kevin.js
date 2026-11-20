@@ -5,6 +5,7 @@ import { angleTowards } from './mobBrains.js';
 import { angleDifference } from './mobs.js';
 import { moveBody } from './physics.js';
 import { KevinFace } from './kevinFace.js';
+import { KevinTag } from './kevinTag.js';
 
 // Kevin: the player's robot companion.
 //
@@ -15,35 +16,49 @@ import { KevinFace } from './kevinFace.js';
 //                 the haze, flashes when hit, swings his legs and arms)
 //   physics.js    gravity and bumping into blocks
 //   kevinFace.js  the pixel face on his TV-screen head
+//   kevinTag.js   the floating name tag above him
+//   kevinName.js  his name (the player can rename him with N)
 //
-// What he does, depending on how far away you are:
-//   closer than 1.1 blocks    steps back out of your way
-//   up to 3.5 blocks          stands still, faces you, glances around now and then
-//   3.5 to 8 blocks           walks towards you (stops again at 2.5)
-//   8 to 24 blocks            hurries to catch up
+// What he does, depending on how far away you are (numbers below):
+//   closer than 2 blocks      steps back to give you room
+//   up to 5 blocks            stands still, faces you, glances around now and then
+//   5 to 10 blocks            walks towards you (stops again at 4)
+//   10 to 24 blocks           hurries to catch up
 //   further than 24           teleports next to you (behind you, out of sight)
+// If he's standing between you and the block you're aiming at, or right
+// next to that block, he shuffles sideways out of your way.
 // He also teleports if he's been stuck, if he can't get any closer for a
 // while, or if you're far above or below him (up a tower, down a pit).
 // So he can never get lost.
 
-// ---- Tuning numbers ----
+// ==========================================================
+//  PERSONAL SPACE: tweak these to change how close he stays.
+//  (All in blocks, measured across the ground.)
+// ==========================================================
+const START_FOLLOWING = 5;    // you're further than this: he walks over...
+const STOP_FOLLOWING = 4;     // ...and stops once he's this close
+const TOO_CLOSE = 2;          // you're closer than this: he steps back...
+const BACK_OFF_TO = 3;        // ...until he's this far away
+const RUN_FROM = 10;          // further than this: he hurries
+const TELEPORT_DISTANCE = 24; // further than this: he teleports to you
+const TELEPORT_RADII = [4, 5, 3]; // how far from you he appears (tries these in order)
+const NEAR_AIMED_BLOCK = 1.5; // this close to the block you're aiming at = in your way
+const IN_THE_WAY_DELAY = 0.5; // seconds he has to be in your way before he moves (so a quick glance doesn't)
+const SHUFFLE_TIME = 0.8;     // seconds he keeps shuffling aside (longer if still in the way)
+
+// ---- Other tuning numbers ----
 const GRAVITY = 25;           // same as the player
 const MAX_FALL_SPEED = 40;
 const WALK_SPEED = 4.3;       // the player walks at 4.5
 const RUN_SPEED = 6.5;        // catching up
-const RUN_FROM = 8;           // further than this: hurry
-const START_FOLLOWING = 3.5;  // further than this: walk to the player...
-const STOP_FOLLOWING = 2.5;   // ...until this close
-const TOO_CLOSE = 1.1;        // closer than this: step out of the way...
-const BACK_OFF_TO = 1.8;      // ...until this far
-const BACK_OFF_SPEED = 2;
+const BACK_OFF_SPEED = 2.5;
+const SHUFFLE_SPEED = 3;
 const TURN_SPEED = 8;         // radians per second
 const JUMP_SPEED = 8;         // clears one block, like the player
 const MAX_DROP = 4;           // happy to step down drops this high
 const DETOUR_ANGLES = [0.7, 1.4, 2.1]; // how far to the side he tries when a wall is in the way
 const DETOUR_TIME = 1;        // seconds he keeps to a side-step before trying straight again
 
-const TELEPORT_DISTANCE = 24; // further than this: teleport
 const TELEPORT_HEIGHT = 5;    // you're this much higher or lower...
 const HEIGHT_PATIENCE = 2.5;  // ...for this many seconds: teleport
 const STUCK_PATIENCE = 3;     // stuck against something for this long: teleport
@@ -56,6 +71,7 @@ const ANNOYED_TIME = 3.5;     // seconds his face stays annoyed after a hit
 const STREAK_TIME = 5;        // hits closer together than this count as a streak
 const SHADE_EVERY = 0.5;      // seconds between "is there open sky above me?" checks
 const FAR_ANIMATION = 40;     // same as mobModel.js: no bobbing further away than this
+const TAG_HEIGHT = 2.45;      // the name tag floats this high above his feet (just over the antenna)
 
 // ---- Looks ----
 // Same format as the creatures in mobTypes.js. Colours: THEME.mobs.kevin.
@@ -106,15 +122,17 @@ const position = new THREE.Vector3();
 const turn = new THREE.Quaternion();
 const ONE = new THREE.Vector3(1, 1, 1);
 const UP = new THREE.Vector3(0, 1, 0);
+const tagPoint = new THREE.Vector3();
 
 export class Kevin {
-  constructor(scene, world, player, camera) {
+  constructor(scene, world, player, camera, tagElement) {
     this.world = world;
     this.player = player;
     this.camera = camera;
 
     this.renderer = new MobRenderer(KEVIN_LOOKS, 1, scene);
     this.face = new KevinFace(scene);
+    this.tag = new KevinTag(tagElement);
     this.bounds = modelBounds(KEVIN_LOOKS);
 
     // His body. The animation fields are the ones mobModel.js expects.
@@ -158,6 +176,9 @@ export class Kevin {
     this.annoyedTimer = 0;
     this.hitStreak = 0;       // hits in a row (for his reactions later)
     this.streakTimer = 0;
+    this.aim = null;          // the block the player is aiming at (from interaction.js), or null
+    this.inTheWayTime = 0;    // how long he's been in the way of it
+    this.shuffleTimer = 0;    // > 0 while he's shuffling out of the way
 
     this.teleport(); // start next to the player
   }
@@ -192,6 +213,12 @@ export class Kevin {
         v.z *= slow;
       }
     } else {
+      // In the way of what you're building or mining? Shuffle aside.
+      this.inTheWayTime = this.isInTheWay() ? this.inTheWayTime + dt : 0;
+      if (this.inTheWayTime > IN_THE_WAY_DELAY) {
+        this.shuffleTimer = SHUFFLE_TIME; // keeps topping up while he's still in the way
+        this.mode = 'idle';               // (so it doesn't count as being stuck while following)
+      }
       this.think(dt);
     }
 
@@ -228,7 +255,12 @@ export class Kevin {
     if (this.mode === 'backoff' && distance > BACK_OFF_TO) this.mode = 'idle';
 
     let speed = 0;
-    if (this.mode === 'follow') {
+    if (this.shuffleTimer > 0) {
+      this.shuffleTimer -= dt;
+      const way = this.shuffleWay();
+      b.goal = way ?? toPlayer;
+      speed = way === null ? 0 : SHUFFLE_SPEED;
+    } else if (this.mode === 'follow') {
       const way = this.chooseWay(toPlayer, dt);
       if (way !== null) {
         b.goal = way;
@@ -264,6 +296,51 @@ export class Kevin {
     }
     b.velocity.x = Math.sin(b.yaw) * trying;
     b.velocity.z = Math.cos(b.yaw) * trying;
+  }
+
+  // ---- Staying out of your way ----
+
+  // interaction.js tells him every frame which block you're aiming at:
+  // { x, y, z, blocking } (blocking = he's between you and it), or null.
+  setAim(aim) {
+    this.aim = aim;
+  }
+
+  // Is he in your line of sight to that block, or standing right next to it?
+  isInTheWay() {
+    const a = this.aim;
+    if (!a) return false;
+    if (a.blocking) return true;
+    const b = this.body;
+    const across = Math.hypot(b.position.x - (a.x + 0.5), b.position.z - (a.z + 0.5));
+    // Level with it, give or take a block (his body is a bit under 2 tall).
+    const level = a.y + 2 > b.position.y && a.y - 1 < b.position.y + b.height;
+    return across < NEAR_AIMED_BLOCK && level;
+  }
+
+  // Which way to shuffle: sideways across your line of sight (staying on
+  // the side he's already on), or else straight away from you. null = boxed in.
+  shuffleWay() {
+    const b = this.body;
+    const p = this.player.position;
+    const a = this.aim;
+    const away = angleTowards(p.x, p.z, b.position.x, b.position.z);
+    const ways = [];
+    if (a) {
+      const lx = a.x + 0.5 - p.x; // your line of sight, across the ground
+      const lz = a.z + 0.5 - p.z;
+      if (Math.hypot(lx, lz) > 0.3) {
+        // At right angles to it, on his side of the line.
+        let sx = -lz;
+        let sz = lx;
+        if (sx * (b.position.x - p.x) + sz * (b.position.z - p.z) < 0) { sx = -sx; sz = -sz; }
+        const side = Math.atan2(sx, sz);
+        ways.push(side, side + Math.PI);
+      }
+    }
+    ways.push(away);
+    for (const way of ways) if (this.probe(way)) return way;
+    return null;
   }
 
   startFollowing() {
@@ -384,7 +461,7 @@ export class Kevin {
     const heights = [0, 1, -1, 2, -2, 3];
     for (let k = -3; k >= -maxBelow; k--) if (!heights.includes(k)) heights.push(k);
 
-    for (const radius of [2, 3, 1.5]) {
+    for (const radius of TELEPORT_RADII) {
       for (const turnBy of [0, 0.6, -0.6, 1.2, -1.2, 1.8, -1.8, 2.5, -2.5, Math.PI]) {
         const x = Math.floor(p.x + Math.sin(behind + turnBy) * radius);
         const z = Math.floor(p.z + Math.cos(behind + turnBy) * radius);
@@ -456,5 +533,8 @@ export class Kevin {
       .setPosition(SCREEN.at[0], SCREEN.at[1] + bob, SCREEN.at[2])
       .premultiply(bodyMatrix);
     this.face.update(dt, this.annoyedTimer > 0 ? 'annoyed' : this.mood, screenMatrix);
+
+    tagPoint.set(b.position.x, b.position.y + TAG_HEIGHT + bob, b.position.z);
+    this.tag.update(tagPoint, this.camera);
   }
 }
