@@ -16,7 +16,7 @@ import { speakingTime } from './kevinVoice.js';
 // He only speaks up while you're playing (not paused or in a menu).
 //
 // What he says comes from the offline brain (kevinBrain.js).
-// say() is also what the chat (step 3) will use for his replies.
+// say() is also how the chat (kevinChat.js) makes him say his replies.
 //
 // Lines never overlap. Important ones (being hit, falling) cut in straight
 // away. Others wait until he's finished the current line (and are dropped if
@@ -33,6 +33,8 @@ const BLACK_HOLE_COOLDOWN = 180;  // seconds before he'll comment on it again
 const NIGHT_FROM = 20;            // hour the night starts...
 const NIGHT_UNTIL = 6;            // ...and ends (same as mobs.js)
 const MAX_WAIT = 6;               // a line waiting its turn is dropped if it waits longer than this
+const EVENT_MEMORY = 180;         // seconds he remembers recent events for (sent with chat messages)
+const EVENT_COUNT = 5;            // ...and at most this many
 
 const look = new THREE.Vector3();
 
@@ -64,6 +66,25 @@ export class KevinTalk {
     this.blackHoleCooldown = 0;
     this.wasNight = this.isNight();
     this.falls = player.falls;
+    this.clock = 0;
+    this.events = [];        // recent happenings, for the chat's game context: [{ text, key, time }]
+  }
+
+  // Remember something that happened (for chat replies, see kevinChat.js).
+  // A note with the same `key` as the last one replaces it (e.g. a hit streak).
+  note(text, key = text) {
+    const last = this.events[this.events.length - 1];
+    if (last?.key === key) this.events.pop();
+    this.events.push({ text, key, time: this.clock });
+    if (this.events.length > EVENT_COUNT) this.events.shift();
+  }
+
+  // The recent events as one line, e.g. "night fell; the player hit Kevin 3 times in a row".
+  recentEventsText() {
+    return this.events
+      .filter((e) => this.clock - e.time < EVENT_MEMORY)
+      .map((e) => e.text)
+      .join('; ');
   }
 
   // Say a line: { text, mood } (from kevinBrain.js, or later the server).
@@ -102,6 +123,7 @@ export class KevinTalk {
 
   update(dt) {
     const playing = this.player.locked;
+    this.clock += dt;
     this.sinceSpoke += dt;
     this.hitGap -= dt;
     this.blackHoleCooldown -= dt;
@@ -130,11 +152,15 @@ export class KevinTalk {
 
     // Things that happened to Kevin (kevin.js).
     for (const event of this.kevin.takeEvents()) {
-      if (event === 'hit' && this.hitGap <= 0) {
-        this.hitGap = HIT_TALK_GAP;
+      if (event === 'hit') {
         const streak = this.kevin.hitStreak;
-        this.say(streak >= 3 ? pickLine('hitStreak', streak) : pickLine('hit'));
+        this.note(streak > 1 ? `the player hit Kevin ${streak} times in a row` : 'the player hit Kevin', 'hit');
+        if (this.hitGap <= 0) {
+          this.hitGap = HIT_TALK_GAP;
+          this.say(streak >= 3 ? pickLine('hitStreak', streak) : pickLine('hit'));
+        }
       } else if (event === 'teleport') {
+        this.note('Kevin fell behind and teleported back to the player');
         this.say(pickLine('teleport'), { interrupt: false });
       }
     }
@@ -142,6 +168,7 @@ export class KevinTalk {
     // You fell out of the world (player.js counts it).
     if (this.player.falls !== this.falls) {
       this.falls = this.player.falls;
+      this.note('the player fell out of the bottom of the world');
       this.say(pickLine('fell'));
     }
 
@@ -149,6 +176,7 @@ export class KevinTalk {
     const night = this.isNight();
     if (night !== this.wasNight) {
       this.wasNight = night;
+      this.note(night ? 'night fell' : 'the sun came up');
       if (playing) this.say(pickLine(night ? 'nightfall' : 'dawn'), { interrupt: false });
     }
 
@@ -156,6 +184,7 @@ export class KevinTalk {
     const staring = playing && this.camera.getWorldDirection(look).dot(this.blackHole) > STARE_ANGLE;
     this.stare = staring ? this.stare + dt : 0;
     if (this.stare > STARE_TIME && this.blackHoleCooldown <= 0) {
+      this.note('the player stared at the black hole');
       if (this.say(pickLine('blackHole'), { interrupt: false })) this.blackHoleCooldown = BLACK_HOLE_COOLDOWN;
     }
 

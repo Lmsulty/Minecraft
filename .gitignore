@@ -11,6 +11,7 @@ npm-debug.log*
 # Secrets — never commit
 .env
 .env.*
+!.env.example
 
 # Mac / editor junk
 .DS_Store

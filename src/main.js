@@ -21,6 +21,7 @@ import { KevinVoice } from './kevinVoice.js';
 import { KevinBubble } from './kevinBubble.js';
 import { KevinCaption } from './kevinCaption.js';
 import { KevinTalk } from './kevinTalk.js';
+import { KevinChat } from './kevinChat.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
@@ -124,6 +125,11 @@ const kevinVoice = new KevinVoice(document.getElementById('kevin-voice'), (text)
 const kevinTalk = new KevinTalk(kevin, player, dayNight, camera,
   new KevinBubble(document.getElementById('kevin-bubble')),
   new KevinCaption(document.getElementById('kevin-caption')), kevinVoice);
+
+// ---- Chatting with Kevin: press Enter (kevinChat.js; replies from askKevin() in kevinReply.js) ----
+new KevinChat(document.getElementById('kevin-chat'), {
+  player, kevin, talk: kevinTalk, hotbar, inventory, mobs, dayNight,
+});
 
 // ---- Creative mode: press C for unlimited blocks ----
 // ---- Inventory screen: press E or Tab ----

@@ -428,6 +428,11 @@ export const THEME = {
     '--kevin-caption-bg': 'rgba(0, 0, 0, 0.6)',  // his line at the bottom of the screen when he's out of sight
     '--kevin-caption-text': '#ffffff',
     '--kevin-caption-name': '#8affd0',
+    '--kevin-chat-bg': 'rgba(12, 20, 24, 0.88)',  // the chat box (press Enter)
+    '--kevin-chat-border': 'rgba(138, 255, 208, 0.45)',
+    '--kevin-chat-input-bg': 'rgba(255, 255, 255, 0.08)',
+    '--kevin-chat-you': '#ffd27a',                // "You:" in the chat
+    '--kevin-chat-kevin': '#8affd0',              // his name in the chat
     '--kevin-rename-bg': 'rgba(24, 26, 32, 0.92)', // the "Rename your robot" box (press N)
     '--kevin-rename-border': 'rgba(138, 255, 208, 0.45)',
     '--kevin-rename-input-bg': 'rgba(255, 255, 255, 0.08)',
