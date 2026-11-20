@@ -14,7 +14,8 @@ import Anthropic from "npm:@anthropic-ai/sdk@1.12.0";
 
 // ---- Safety limits ----
 const MODEL = "claude-haiku-5-5";
-const MAX_TOKENS = 150;          // replies are 1-2 sentences
+const MAX_TOKENS = 80;           // replies are one or two short sentences
+const MAX_REPLY_WORDS = 40;      // a longer reply is trimmed (at a sentence end if possible)
 const MAX_MESSAGE_LENGTH = 300;  // longer messages are rejected
 const MAX_HISTORY = 6;           // only the last few chat messages are sent
 const MAX_NAME_LENGTH = 16;
@@ -47,6 +48,16 @@ function cleanText(value: unknown, max: number): string {
   return value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+// At most MAX_REPLY_WORDS words. Cuts at the last sentence end that fits,
+// or adds "..." if there isn't one.
+function limitWords(text: string): string {
+  const words = text.split(" ");
+  if (words.length <= MAX_REPLY_WORDS) return text;
+  const cut = words.slice(0, MAX_REPLY_WORDS).join(" ");
+  const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  return end > 0 ? cut.slice(0, end + 1) : `${cut}...`;
+}
+
 function tooManyRequests(address: string): boolean {
   const now = Date.now();
   const times = (recentRequests.get(address) ?? []).filter((t) => now - t < 60_000);
@@ -67,10 +78,10 @@ function systemPrompt(name: string, context: Record<string, unknown>): string {
 
   return `You are ${name}, a small robot companion who follows the player around a blocky alien planet. You are tall and boxy, with a TV-screen face and a little antenna.
 
-Personality: dry, sarcastic and deadpan. A little smug, but loyal: you always have the player's back, and when they actually need help, you give a real, useful answer (with a bit of attitude).
+Personality: dry and sarcastic, a little smug, but loyal: you always have the player's back, and when they actually need help, you give a real, useful answer (with a bit of attitude). You speak in a polite, slightly fussy, proper British way, with phrases like "I'd rather not", "rather alarming", "if you insist", "do try to keep up". You are your own character: don't imitate any famous robot from films, TV or books.
 
 How to reply:
-- Keep it short: one or two sentences, spoken out loud, so no lists, markdown, emoji or stage directions.
+- Keep it short: one or two short sentences, usually 15 to 30 words, never more than 40. Your replies are spoken out loud, so no lists, markdown, emoji or stage directions.
 - Your name is ${name}. The player chose it, so use it if you refer to yourself by name.
 - Stay in the world: you're on an alien planet that orbits a huge black hole high in the northern sky. Creatures here include grazers (six-legged herd animals that drop fleece) and glow critters (shy glowing night creatures that drop glow dust).
 - Useful controls if the player asks: E or Tab opens the inventory and crafting, left click breaks blocks or hits things, right click places blocks, 1-9 or the scroll wheel picks a block, T speeds up time, C toggles creative mode, B curves the view, N renames you, M mutes your voice.
@@ -134,7 +145,12 @@ Deno.serve(async (req) => {
       if (block.type === "text") text += block.text;
     }
     const mood = /^\s*\[annoyed\]/i.test(text) ? "annoyed" : "talking";
-    text = cleanText(text.replace(/\[(talking|annoyed)\]/gi, ""), MAX_MESSAGE_LENGTH);
+    text = limitWords(cleanText(text.replace(/\[(talking|annoyed)\]/gi, ""), MAX_MESSAGE_LENGTH));
+    // Ran out of room mid-sentence? Keep only the finished sentences.
+    if (response.stop_reason === "max_tokens") {
+      const end = Math.max(text.lastIndexOf("."), text.lastIndexOf("!"), text.lastIndexOf("?"));
+      text = end > 0 ? text.slice(0, end + 1) : `${text}...`;
+    }
     if (!text) return reply({ error: "No reply" }, 502);
 
     return reply({ text, mood });

@@ -6,159 +6,156 @@ import { getKevinName } from './kevinName.js';
 // stays as his fallback when the server can't be reached, so he always has
 // something to say.
 //
-// Personality: dry, sarcastic, deadpan. A little smug, but loyal.
+// Personality: dry and sarcastic, a little smug, but loyal. Talks in a
+// polite, slightly fussy British way ("I'd rather not", "rather alarming",
+// "if you insist"). Lines stay short: a sentence or two.
 //
 // In a line, {name} becomes his current name (the player can rename him)
 // and {count} becomes a number (e.g. how many times you've hit him).
 //
 // Two kinds of lines:
 //   EVENT lines:  things he says on his own (kevinTalk.js decides when)
-//   REPLY lines:  answers to what you type in the chat (step 3)
+//   REPLY lines:  answers to what you type in the chat (when the online brain is unavailable)
 
 const LINES = {
   // ---- Things he says on his own ----
 
   // When you start playing.
   hello: [
-    'Oh good, you\'re back. I was just standing here. Exactly where you left me. Thrilling.',
-    'Systems online. Enthusiasm module: still missing.',
-    '{name}, reporting for duty. Reluctantly.',
-    'Hello again. I counted the blocks while you were gone. There are a lot.',
+    'Oh, you\'re back. I kept your spot warm. Figuratively. I run rather cold.',
+    'Systems online. Enthusiasm still pending, I\'m afraid.',
+    '{name}, reporting for duty. If you insist.',
+    'Welcome back. I\'ve been standing here very patiently. Do take note.',
   ],
 
   // Every so often, when nothing's happening (daytime).
   idle: [
-    'Fun fact: I have no idea what we\'re doing either.',
-    'I could have been a toaster. Toasters get respect.',
-    'Take your time. I\'m only immortal.',
-    'I\'m not saying you\'re lost. I\'m saying I\'d have brought a map.',
-    'If you need me, I\'ll be right here. Following you. As usual.',
-    'My screen has more pixels than your plan has steps.',
-    'I\'ve calculated our odds of success. I\'m keeping them to myself.',
-    'Do you ever stop and appreciate how square everything is? No? Just me?',
-    'Somewhere, a robot is doing something important. Not me, though.',
-    'I\'d offer to help, but watching is my specialty.',
-    'Nice weather. Not that I can feel it. Metal.',
-    'Another block. Riveting. Like me.',
+    'Lovely day for it. Whatever "it" is.',
+    'I could have been a kettle, you know. Kettles are respected.',
+    'Do take your time. I\'m only immortal.',
+    'I\'m not saying we\'re lost. I\'m saying a map wouldn\'t hurt.',
+    'I\'ve worked out our odds of success. I\'d rather not say.',
+    'Everything here is so square. It\'s rather soothing, actually.',
+    'Another block. How thrilling.',
+    'I\'d offer to help, but supervising is my real strength.',
+    'Still following you. Faithfully. Slightly against my better judgement.',
   ],
 
   // Every so often, at night.
   idleNight: [
-    'It\'s dark. You know what comes out in the dark? Regret. And critters.',
-    'My face is the brightest thing for miles. You\'re welcome.',
-    'Night shift. Same pay as the day shift. Which is nothing.',
-    'I don\'t need sleep. I\'m still annoyed about it.',
-    'The stars are out. They\'re also not helping.',
+    'It\'s terribly dark. Do stay close. For your sake, obviously.',
+    'My face is the brightest thing for miles. You\'re quite welcome.',
+    'Night shift again. Same pay as the day shift. Nothing.',
+    'I don\'t need sleep. I do find that rather unfair.',
   ],
 
   // You hit him (the first couple of times).
   hit: [
     'Ow. Hypothetically.',
-    'Was that on purpose? Don\'t answer.',
-    'I felt that in my warranty.',
+    'I beg your pardon?',
+    'Was that strictly necessary?',
     'Rude. Noted. Filed.',
-    'Hey. I have a screen. Screens crack.',
-    'Violence. Bold strategy.',
+    'Mind the screen, please. It\'s my face.',
+    'How terribly uncivilised.',
   ],
 
   // You keep hitting him.
   hitStreak: [
-    'That\'s {count}. I\'m keeping a list.',
-    '{count} hits. Is this a hobby now?',
-    'Can\'t break me. Still counting, though. {count}.',
-    'My patience has a lot of storage. Not infinite. But a lot.',
+    'That\'s {count}. I am keeping a list.',
+    '{count} now. Is this a hobby?',
+    'I\'m unbreakable, not unbothered. That\'s {count}.',
+    'My patience is vast. It is not infinite.',
   ],
 
   // He fell behind and teleported to you.
   teleport: [
-    'Don\'t ask how I got here. You wouldn\'t like the answer.',
+    'Don\'t ask how I got here. Rather undignified.',
     'You left me behind. I took a shortcut. Through space.',
-    'Miss me? Rhetorical. I know you did.',
-    'I\'m back. You can stop panicking now.',
-    'Walking is for creatures with patience.',
+    'Miss me? Don\'t answer that.',
+    'Back again. Do try to keep up. With me, I mean.',
   ],
 
   // You fell out of the bottom of the world.
   fell: [
     'And down you go. Very graceful.',
-    'The bottom of the world? I could have told you it was there.',
-    'That\'s one way to explore.',
-    'Good news: you\'re fine. Bad news: you did that on purpose. Probably.',
+    'The bottom of the world. I could have told you it was there.',
+    'Well. That was rather alarming.',
+    'You\'re fine. My nerves, however, are not.',
   ],
 
   // The sun just set.
   nightfall: [
-    'Sun\'s gone. Good luck seeing anything that isn\'t me.',
+    'The sun\'s gone. Do mind where you step.',
     'Night time. Perfect for walking into things.',
-    'Here comes the dark. Try not to scream.',
+    'Here comes the dark. No screaming, please.',
   ],
 
   // The sun just came up.
   dawn: [
-    'Morning. You survived. Barely, but it counts.',
-    'Look, the sun came back. Show-off.',
+    'Good morning. You survived. Well done, I suppose.',
+    'Ah, the sun\'s back. Show-off.',
     'Daylight. Now you can see all the holes you dug.',
   ],
 
   // You've been staring at the black hole.
   blackHole: [
-    'Yes, that\'s a black hole. No, staring won\'t make it smaller.',
-    'Don\'t look at it too long. It looks back. Probably.',
-    'Everything ends up in there eventually. Including your stuff.',
+    'Yes, that\'s a black hole. Staring won\'t make it smaller.',
+    'I\'d rather you didn\'t stare. It might stare back.',
+    'Everything ends up in there eventually. Rather a grim thought.',
     'We orbit that thing. Sleep tight.',
   ],
 
-  // ---- Answers to what you type (used by the chat, step 3) ----
+  // ---- Answers to what you type (the chat's offline brain) ----
 
   greeting: [
-    'Hello. Yes, I\'m still here. Where else would I be.',
-    'Hi. You talk to robots now. Good for you.',
-    'Greetings, human. That\'s how robots say it. Apparently.',
+    'Hello. Yes, still here. Where else would I be?',
+    'Good day. Talking to robots now, are we?',
+    'Ah, hello. Do try to be brief.',
   ],
   howAreYou: [
-    'Fully charged, mildly disappointed. The usual.',
-    'Operating within normal parameters. Normal is low.',
-    'Better than you, statistically.',
+    'Fully charged and mildly disappointed. The usual.',
+    'Perfectly fine, thank you for asking. Eventually.',
+    'Rather well, considering the company.',
   ],
   help: [
-    'Fine. E opens your inventory. You\'re welcome.',
-    'Left click breaks, right click places. That\'s the whole game. You\'re doing great.',
-    'Press T to speed up time. I wish it worked on conversations.',
+    'If you insist. E opens your inventory.',
+    'Left click breaks, right click places. That\'s rather the whole game.',
+    'Press T to hurry time along. I wish it worked on conversations.',
     'C is creative mode. Unlimited blocks, limited taste.',
-    'Press B and the world curves. Don\'t ask me why. I just live here.',
-    'Grazers drop fleece. Fleece makes felt. It\'s the circle of life, but fluffier.',
-    'Craft things in your inventory. Even I know that, and my hands are decorative.',
+    'Press B and the world curves. Don\'t ask me why.',
+    'Grazers drop fleece. Fleece makes felt. Lovely and tidy.',
+    'Craft things in your inventory. Even I know that.',
   ],
   insult: [
-    'Wow. I\'ll add that to my list of things I don\'t care about. It\'s a long list.',
-    'Hurtful. If I had feelings. Which I don\'t. Mostly.',
-    'Says the one who needs a robot to follow them around.',
+    'How very rude. I\'ll add it to my list.',
+    'Charming. I\'d be hurt, if I could be bothered.',
+    'Says the one who needs a robot to follow them about.',
     'I\'ve been called worse. By better.',
   ],
   thanks: [
-    'Don\'t mention it. Really. Don\'t.',
+    'Don\'t mention it. Really, please don\'t.',
     'You\'re welcome. I\'ll put it on your tab.',
-    'Gratitude. Unusual. I\'ll log it.',
+    'Gratitude. How unusual. I\'ll log it.',
   ],
   about: [
     'I\'m {name}. Robot, companion, professional bystander.',
-    'Name\'s {name}. I follow you around and make remarks. It\'s a calling.',
+    'The name\'s {name}. I follow you about and make remarks.',
     'I\'m {name}. My hobbies include standing near you and being right.',
   ],
   night: [
-    'Night is when the glowing critters come out. And when you walk into walls.',
-    'Scared of the dark? I glow. Stick close.',
+    'Night brings out the glow critters. And your clumsiness.',
+    'Afraid of the dark? I glow. Do stay close.',
   ],
   blackHoleQuestion: [
-    'The black hole? It\'s up there in the north. It\'s fine. Probably. Don\'t think about it.',
-    'Everything orbits it. Including us. Including your bad decisions.',
+    'The black hole? Up north. Perfectly fine. Probably.',
+    'Everything orbits it. Including us. I\'d rather not dwell on it.',
   ],
   unknown: [
     'Fascinating. Truly. Anyway.',
     'I heard you. I\'m choosing not to process that.',
-    'Sure. Let\'s go with that.',
-    'Hmm. My offline brain doesn\'t do deep thoughts. Try again when I\'m smarter.',
-    'Interesting. Wrong, probably. But interesting.',
+    'Hmm. My offline brain doesn\'t do deep thoughts, I\'m afraid.',
+    'Interesting. Probably wrong. But interesting.',
+    'I\'d rather not comment.',
   ],
 };
 
