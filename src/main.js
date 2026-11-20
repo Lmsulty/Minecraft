@@ -15,6 +15,7 @@ import { DayNight } from './dayNight.js';
 import { updateCurve, cullBentChunks } from './curve.js';
 import { GraphicsSettings } from './graphics.js';
 import { Mobs } from './mobs.js';
+import { Kevin } from './kevin.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
@@ -102,10 +103,13 @@ function findSpawn(x, z) {
 // ---- Creatures: spawn near the player, wander, and can be hit (mobs.js) ----
 const mobs = new Mobs(scene, world, player, camera, dayNight);
 
+// ---- Kevin, your robot companion: follows you everywhere (kevin.js) ----
+const kevin = new Kevin(scene, world, player, camera);
+
 // ---- Breaking and placing blocks (and hitting creatures) ----
 // The hotbar's scroll wheel only works while playing (mouse captured).
 const hotbar = new Hotbar(document.getElementById('hotbar'), inventory, () => player.locked);
-const interaction = new Interaction(camera, world, player, scene, hotbar, inventory, mobs);
+const interaction = new Interaction(camera, world, player, scene, hotbar, inventory, mobs, kevin);
 
 // ---- Creative mode: press C for unlimited blocks ----
 // ---- Inventory screen: press E or Tab ----
@@ -152,6 +156,7 @@ function loop(now) {
   world.update(player.position.x, player.position.z); // load/unload chunks, a few ms at most
   player.update(dt);
   mobs.update(dt);     // after the player moves, so they react to where you are now
+  kevin.update(dt);    // same for Kevin
   interaction.update();
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera
   updateCurve(camera);                   // the cylinder bend starts at the camera

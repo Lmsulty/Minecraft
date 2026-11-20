@@ -210,6 +210,23 @@ export const THEME = {
       glow: '#7ff5d8',       // antenna tips, belly and tail tip (these glow)
       light: '#a6ece0',      // colour of the light it casts, its halo and the pool of light under it
     },
+    kevin: {                 // the player's robot companion (kevin.js), brushed blue-grey metal
+      body: '#7d8ea3',
+      panel: '#4b5868',      // the panel on his chest
+      belt: '#3c4552',       // hips and neck
+      legs: '#5f6d7e',
+      arms: '#6c7b8d',
+      head: '#8a9bb0',       // the TV box
+      bezel: '#1e232b',      // dark frame round the screen
+      rivet: '#c9d3de',      // rivets and the knobs on the side of his head
+      antenna: '#3c4552',
+      tip: '#ff6b4a',        // glowing antenna tip
+      // His face (kevinFace.js). The screen always shines, even at night.
+      screenBg: '#0b2320',   // dark green-black screen
+      screenLines: '#0f2b27', // faint TV lines across it
+      screenPixel: '#8affd0', // his eyes and mouth
+      screenAngry: '#ffb04a', // eyes and mouth when he's annoyed
+    },
   },
 
   // ---- Item pictures (see itemIcons.js for the patterns) ----

@@ -47,7 +47,7 @@ function dropList(type) {
 }
 
 // Smallest difference between two angles, from -PI to PI.
-function angleDifference(a, b) {
+export function angleDifference(a, b) {
   let d = (a - b) % (Math.PI * 2);
   if (d > Math.PI) d -= Math.PI * 2;
   if (d < -Math.PI) d += Math.PI * 2;

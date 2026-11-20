@@ -6,7 +6,7 @@ import { bendMaterial, unbendPoint } from './curve.js';
 
 // Breaking and placing blocks: finds the block under the crosshair,
 // draws an outline around it, and handles mouse clicks.
-// Left click also hits creatures (mobs.js), if one is closer than the block.
+// Left click also hits creatures (mobs.js) and Kevin (kevin.js), if one is closer than the block.
 // Which block gets placed comes from the hotbar (hotbar.js).
 // Broken blocks go into the inventory; placing a block uses one up.
 // Defeated creatures' drops go straight into the inventory too.
@@ -20,9 +20,10 @@ const REFINE_STEPS = 12; // extra checks to find exactly where the ray enters a 
 const MOB_STEP = 0.1;    // blocks between checks when looking for a creature
 
 export class Interaction {
-  constructor(camera, world, player, scene, hotbar, inventory, mobs) {
+  constructor(camera, world, player, scene, hotbar, inventory, mobs, kevin) {
     this.camera = camera;
     this.mobs = mobs;
+    this.kevin = kevin; // the robot companion (kevin.js): can be hit, but never defeated
     this.world = world;
     this.player = player;
     this.hotbar = hotbar;
@@ -60,6 +61,10 @@ export class Interaction {
     const hit = this.raycast();
     // A creature in the way, closer than the block (or with no block in reach)?
     const mob = this.mobInSight(hit ? hit.t : REACH);
+    if (mob === this.kevin) {
+      this.kevin.hit(this.player.position);
+      return;
+    }
     if (mob) {
       if (this.mobs.hit(mob, this.player.position) === 'defeated') this.collectDrops(mob);
       return;
@@ -152,15 +157,17 @@ export class Interaction {
     return null;
   }
 
-  // The first creature along the line of sight, up to `maxT` blocks away, or
-  // null. Walks along the drawn line and turns each point back into the flat
-  // world, like raycast(), so it also works in the curved view.
+  // The first creature (or Kevin) along the line of sight, up to `maxT`
+  // blocks away, or null. Walks along the drawn line and turns each point
+  // back into the flat world, like raycast(), so it also works in the curved view.
   mobInSight(maxT) {
     const origin = this.camera.position;
     const dir = this.camera.getWorldDirection(this.direction);
     for (let t = MOB_STEP; t <= maxT; t += MOB_STEP) {
       this.drawnPoint.copy(origin).addScaledVector(dir, t);
-      const mob = this.mobs.mobAt(unbendPoint(this.drawnPoint, origin.x, this.flatPoint));
+      const point = unbendPoint(this.drawnPoint, origin.x, this.flatPoint);
+      if (this.kevin?.isAt(point)) return this.kevin;
+      const mob = this.mobs.mobAt(point);
       if (mob) return mob;
     }
     return null;
