@@ -18,16 +18,21 @@ import { CHUNK_SIZE } from './world.js';
 // ==========================================================
 
 // ---- The ship's shape: a stubby explorer rocket, standing upright ----
-// Ship coordinates, in blocks: y up from the ground, x and z across it
+// Ship coordinates, in blocks: y up from the bottom of the rocket (the
+// highest ground under it), x and z across it
 // (+x = the side with the door and ramp).
 //   at:     the middle of the box
 //   size:   [width (x), height (y), depth (z)]
 //   color:  a colour name from THEME.ship
 //   glow:   true = always fully bright, so it shows at night
 //   tilt:   [x, y, z] degrees to turn the box
-//   leg:    a landing leg: it stretches down to reach the ground under `ground`
-//   foot:   a landing pad: it moves down with its leg (also uses `ground`)
-//   ground: [x, z] where a leg or pad touches the ground
+//   ground: [x, z]: this part reaches down to the real ground there. For a
+//           `beam` that's its bottom end; anything else moves down to sit on it.
+//   beam:   instead of at/size/tilt, a straight bar from `from` [x, y, z] (fixed
+//           on the rocket) down to the ground at `ground`, plus `lift` above it.
+//           thick: [across, sideways] size; `flat` = a slab that stays level
+//           sideways (the ramp). Legs and the ramp are beams, so they always
+//           reach the ground, however uneven it is.
 //   blink:  the light on the nose (blinks on and off)
 
 // The body is round-ish: three overlapping boxes (a square plus a wide one
@@ -52,9 +57,11 @@ function legs() {
     const a = THREE.MathUtils.degToRad(degrees);
     const out = (r) => [r * Math.cos(a), r * -Math.sin(a)]; // r blocks out from the middle, this way
     const [fx, fz] = out(3.0);
-    parts.push({ at: [out(2.4)[0], 1.15, out(2.4)[1]], size: [0.35, 2.5, 0.35], color: 'legs', leg: true,
-      tilt: [0, degrees, 28], ground: [fx, fz] });
-    parts.push({ at: [fx, 0.07, fz], size: [0.9, 0.14, 0.9], color: 'feet', foot: true, ground: [fx, fz] });
+    const [tx, tz] = out(1.8);
+    // The leg: from the bottom of the body down to the top of its pad.
+    parts.push({ beam: true, from: [tx, 2.2, tz], ground: [fx, fz], lift: 0.14, thick: [0.35, 0.35], color: 'legs' });
+    // The pad, sitting on the ground.
+    parts.push({ at: [fx, 0.07, fz], size: [0.9, 0.14, 0.9], color: 'feet', ground: [fx, fz] });
   }
   return parts;
 }
@@ -113,7 +120,7 @@ const PARTS = [
 
   // The door near the bottom, a short ramp down to the ground, and two door lights.
   { at: [2.25, 2.4, 0], size: [0.06, 1.8, 1.1], color: 'door' },
-  { at: [3.12, 0.78, 0], size: [2.27, 0.12, 1.2], color: 'metal', tilt: [0, 0, -40] },
+  { beam: true, flat: true, from: [2.25, 1.45, 0], ground: [4.0, 0], lift: 0.06, thick: [0.12, 1.2], color: 'metal' },
   { at: [2.27, 3.5, -0.75], size: [0.08, 0.15, 0.15], color: 'light', glow: true },
   { at: [2.27, 3.5, 0.75], size: [0.08, 0.15, 0.15], color: 'light', glow: true },
 ];
@@ -131,16 +138,39 @@ const BLINK_SECONDS = 1.2;                     // the tail light: one blink per 
 // the part's own spot, tilt and size. `drop` stretches a leg further down.
 const scratchQuaternion = new THREE.Quaternion();
 const scratchEuler = new THREE.Euler();
-function partMatrix(part, origin, turns, drop = 0) {
-  const at = new THREE.Vector3(...part.at);
-  const size = new THREE.Vector3(...part.size);
-  if (part.leg) { at.y -= drop / 2; size.y += drop; }
-  if (part.foot) at.y -= drop;
-  const tilt = (part.tilt ?? [0, 0, 0]).map(THREE.MathUtils.degToRad);
-  scratchQuaternion.setFromEuler(scratchEuler.set(tilt[0], tilt[1], tilt[2]));
-  const own = new THREE.Matrix4().compose(at, scratchQuaternion, size);
+// `groundY` = the height of the real ground under part.ground, compared with
+// the bottom of the rocket (0 = level with it, -1 = one block lower...).
+function partMatrix(part, origin, turns, groundY = 0) {
+  const own = part.beam ? beamMatrix(part, groundY) : boxMatrix(part, groundY);
   const ship = new THREE.Matrix4().makeRotationY(turns * Math.PI / 2).setPosition(origin);
   return ship.multiply(own);
+}
+
+// An ordinary box: at, size, tilt. Parts with `ground` move down onto it.
+function boxMatrix(part, groundY) {
+  const at = new THREE.Vector3(...part.at);
+  if (part.ground) at.y += groundY;
+  const tilt = (part.tilt ?? [0, 0, 0]).map(THREE.MathUtils.degToRad);
+  scratchQuaternion.setFromEuler(scratchEuler.set(tilt[0], tilt[1], tilt[2]));
+  return new THREE.Matrix4().compose(at, scratchQuaternion, new THREE.Vector3(...part.size));
+}
+
+// A beam: a bar from `from` to the ground. The box's height runs along the
+// bar; its width and depth (`thick`) go across it.
+function beamMatrix(part, groundY) {
+  const top = new THREE.Vector3(...part.from);
+  const bottom = new THREE.Vector3(part.ground[0], groundY + part.lift, part.ground[1]);
+  const along = top.clone().sub(bottom);
+  const length = along.length();
+  along.normalize();
+  // Which way is "sideways": for the ramp, level (so it's a flat slab you'd
+  // walk up); for legs, any direction (they're square).
+  const hint = part.flat ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(along.z, 0, -along.x).normalize();
+  const across = along.clone().cross(hint).normalize();
+  const sideways = across.clone().cross(along).normalize();
+  const turn = new THREE.Matrix4().makeBasis(across, along, sideways);
+  const middle = top.clone().add(bottom).multiplyScalar(0.5);
+  return turn.setPosition(middle).multiply(new THREE.Matrix4().makeScale(part.thick[0], length, part.thick[1]));
 }
 
 // The block cells a box covers (shrunk a hair, so a box that only touches a
@@ -246,13 +276,13 @@ export function chooseShipSite(terrain, editStore, near) {
 
   // The ship stands on the highest ground under it; legs reach down the rest.
   const origin = new THREE.Vector3(best.ox, best.high + 1, best.oz);
-  const drops = PARTS.map((part) => {
-    if (!part.leg && !part.foot) return 0;
-    const [gx, gz] = part.ground ?? [part.at[0], part.at[2]];
-    const column = toWorldColumn(new THREE.Vector3(gx, 0, gz), origin, best.turns);
-    return best.high - terrain.height(column.x, column.z);
+  // Legs, pads and the ramp reach the real ground under them.
+  const groundYs = PARTS.map((part) => {
+    if (!part.ground) return 0;
+    const column = toWorldColumn(new THREE.Vector3(part.ground[0], 0, part.ground[1]), origin, best.turns);
+    return terrain.height(column.x, column.z) - best.high;
   });
-  const matrices = PARTS.map((part, i) => partMatrix(part, origin, best.turns, drops[i]));
+  const matrices = PARTS.map((part, i) => partMatrix(part, origin, best.turns, groundYs[i]));
   const cells = new Map();
   for (const m of matrices) cellsOf(m, cells);
   return {
