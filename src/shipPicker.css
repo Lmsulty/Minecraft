@@ -1,0 +1,144 @@
+/* ==========================================================
+   Ship boarding hint and planet picker: shapes and sizes.
+   COLOURS are set in src/theme.js (THEME.ui), not here:
+   --ship-hint-bg, --ship-hint-text, --ship-hint-key, --inv-backdrop,
+   --inv-panel-bg, --inv-panel-border, --inv-title, --picker-card-bg,
+   --picker-card-border, --picker-card-hover, --picker-card-hover-border,
+   --picker-slip-text, --picker-here-text, --text
+   Each card's stripe colour is the planet's `color` in THEME.planets.
+   ========================================================== */
+
+/* "Press R to board", just above the hotbar */
+#ship-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: var(--ship-hint-bg);
+  color: var(--ship-hint-text);
+  font: 600 18px system-ui, sans-serif;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 5;
+}
+#ship-hint.is-shown {
+  opacity: 1;
+}
+.ship-hint-key {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 4px;
+  border: 2px solid var(--ship-hint-key);
+  border-radius: 4px;
+  color: var(--ship-hint-key);
+  text-align: center;
+}
+
+/* Dims the game behind the panel */
+.picker-screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--inv-backdrop);
+  font-family: system-ui, sans-serif;
+  color: var(--text);
+  user-select: none;
+  z-index: 10;
+}
+.picker-screen.is-open {
+  display: flex;
+}
+
+.picker-panel {
+  max-width: 820px;
+  padding: 20px 24px;
+  border: 1px solid var(--inv-panel-border);
+  border-radius: 10px;
+  background: var(--inv-panel-bg);
+}
+.picker-title {
+  margin: 0 0 14px;
+  color: var(--inv-title);
+  font-size: 22px;
+}
+.picker-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* One planet */
+.picker-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 240px;
+  padding: 18px 14px 14px;
+  overflow: hidden;
+  border: 1px solid var(--picker-card-border);
+  border-radius: 8px;
+  background: var(--picker-card-bg);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.picker-card:hover:not(:disabled) {
+  border-color: var(--picker-card-hover-border);
+  background: var(--picker-card-hover);
+}
+.picker-stripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: var(--planet-color);
+}
+.picker-number {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  font-size: 13px;
+  opacity: 0.6;
+}
+.picker-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+.picker-description {
+  font-size: 14px;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+.picker-slip {
+  margin-top: 4px;
+  color: var(--picker-slip-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The planet you're on: greyed out */
+.picker-card.is-here {
+  cursor: default;
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+.picker-here {
+  color: var(--picker-here-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.picker-help {
+  margin: 14px 0 0;
+  font-size: 13px;
+  opacity: 0.7;
+}

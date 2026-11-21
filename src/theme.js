@@ -15,6 +15,10 @@ export const THEME = {
   // Every planet orbits the same black hole. Each one is its own endless world
   // with its own seed (so its own terrain and its own save).
   //   name:    shown on screen
+  //   description: one line about it, on its card in the ship's planet picker
+  //   timeSlip: how much faster time passes at home while you're here. Planets
+  //            closer to the black hole have a bigger slip (1 = none).
+  //   color:   the stripe on its card in the planet picker
   //   seed:    the number its terrain grows from. Changing it gives a brand new
   //            world (and the old save for that planet no longer lines up).
   //   changes: settings that are DIFFERENT from home. Anything you put here
@@ -25,11 +29,17 @@ export const THEME = {
   planets: {
     home: {
       name: 'Home',
+      description: 'Golden meadows, tiered forests and deep caves.',
+      timeSlip: 1,
+      color: '#9fc0d0',
       seed: 12345,
       changes: {},
     },
     water: {
       name: 'Water world',
+      description: 'Shallow teal seas, pale sand islands and a ringed planet overhead.',
+      timeSlip: 60,
+      color: '#3fb0c8',
       seed: 777,
       changes: {
         // Low ground under a shallow sea, with sandy islands poking out.
@@ -92,6 +102,9 @@ export const THEME = {
     },
     lava: {
       name: 'Lava planet',
+      description: 'Black glass hills split by glowing cracks, under a dark red sky.',
+      timeSlip: 10,
+      color: '#c0582a',
       seed: 4242,
       changes: {
         // Rugged hills of black glass, split by glowing orange cracks.
@@ -680,6 +693,16 @@ export const THEME = {
     '--kevin-pick-ring-bad': '#ff6b5a',           // ...when the spot won't work
     '--kevin-pick-track': 'rgba(255, 255, 255, 0.25)',
     '--kevin-pick-text': '#ffffff',
+
+    '--ship-hint-bg': 'rgba(0, 0, 0, 0.55)',      // "Press R to board" near the ship's ramp
+    '--ship-hint-text': '#ffffff',
+    '--ship-hint-key': '#7ff5e8',                 // the R (the ship's window colour)
+    '--picker-card-bg': 'rgba(255, 255, 255, 0.06)', // a planet card in the ship's planet picker
+    '--picker-card-border': 'rgba(255, 255, 255, 0.2)',
+    '--picker-card-hover': 'rgba(255, 255, 255, 0.16)',
+    '--picker-card-hover-border': '#7ff5e8',
+    '--picker-slip-text': '#ffd27a',              // the time slip line
+    '--picker-here-text': '#8affd0',              // "You are here"
   },
 };
 

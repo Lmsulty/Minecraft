@@ -285,12 +285,14 @@ export function chooseShipSite(terrain, editStore, near) {
   const matrices = PARTS.map((part, i) => partMatrix(part, origin, best.turns, groundYs[i]));
   const cells = new Map();
   for (const m of matrices) cellsOf(m, cells);
+  const door = toWorldColumn(RAMP_FOOT, origin, best.turns);
+  door.y = terrain.height(door.x, door.z) + 1; // standing height there
   return {
     origin,
     turns: best.turns,
     matrices,
     cells: [...cells.values()],
-    door: toWorldColumn(RAMP_FOOT, origin, best.turns), // where you stand when you get off
+    door, // where you stand when you get off (and where you board)
   };
 }
 

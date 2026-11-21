@@ -13,6 +13,7 @@ import { InventoryScreen } from './inventoryScreen.js';
 import { applyUiTheme, THEME, PLANET } from './theme.js';
 import { setupDebugPlanetKey } from './planets.js';
 import { Ship, chooseShipSite } from './ship.js';
+import { ShipPicker } from './shipPicker.js';
 import { DayNight } from './dayNight.js';
 import { Underwater } from './underwater.js';
 import { updateCurve, cullBentChunks } from './curve.js';
@@ -185,6 +186,10 @@ graphics.attach({
   notice: document.getElementById('notice'),
 });
 
+// ---- Boarding the ship: near its ramp, press R to pick a planet (shipPicker.js) ----
+const shipPicker = new ShipPicker(document.getElementById('ship-hint'),
+  document.getElementById('ship-picker'), player, shipSite.door);
+
 // ---- Debug: press P to jump to the next planet (switch off in planets.js) ----
 setupDebugPlanetKey();
 
@@ -217,7 +222,8 @@ function loop(now) {
   player.update(dt);
   mobs.update(dt);     // after the player moves, so they react to where you are now
   kevin.update(dt);    // same for Kevin
-  ship.update(dt);     // blinks the light on its tail fin
+  ship.update(dt);     // blinks the light on its nose
+  shipPicker.update(); // "Press R to board" near the ramp
   kevinBuilder.update(dt); // places his next block, if he's building something
   kevinOrders.update(dt);  // starts his next job, or waits for you to pick a spot
   kevinTalk.update(dt); // after Kevin moves, so his speech bubble follows him
