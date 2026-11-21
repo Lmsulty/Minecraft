@@ -84,20 +84,8 @@ export const THEME = {
             speckLight: '#ffffff',
           },
         },
-        // The closest planet: the black hole fills a big part of the sky.
-        // Here it looks like a huge hole: a big black centre (about 85% of
-        // its width) with only a thin fiery ring hugging the edge.
-        blackHole: {
-          size: 14,              // black centre: 34 degrees across...
-          swirlSize: 1.25,       // ...and the fiery ring ends just outside it (40 degrees across in all)
-          swirlFadeStart: 0.9,   // the ring stays bright right up to its thin outer edge
-          edgeSoftness: 0.05,    // a sharp edge to the hole
-          gasFadeIn: [1.02, 1.05], // the ring starts right at the edge: no gap, no gas over the black
-          viewAngle: 80,         // seen almost face-on, so the ring shows all the way round
-          brightness: 1.8,       // the thin ring blazes a little brighter
-          glowAmount: 0.03,      // hardly any glow spreading into the sky
-          bendStrength: 1.7,     // the faint ring of bent starlight sits just outside the fiery ring
-        },
+        // The closest planet: the black hole looks biggest from here.
+        blackHole: { size: 14 }, // black centre 28 degrees across, 35 with its ring
 
         ui: { '--page-bg': '#bfe8e4' },
       },
@@ -123,21 +111,25 @@ export const THEME = {
         trees: { chance: 0 },
 
         // Dark red sky, never really blue. Same hours as home's keyframes.
+        // Nights aren't pitch black: a dim red glow from the sky above and the
+        // cracks below (ambientSky / ambientGround) keeps the hills visible.
         skyKeyframes: [
-          { hour: 4,  name: 'night',   sky: '#1a0806', skyTop: '#060102', light: '#ff7a4a', lightStrength: 0.35, ambientSky: '#7a2c20', ambientGround: '#2a0c08', ambientStrength: 0.75,  cloudLit: '#3a1410', cloudShade: '#120606', stars: 0.8 },
-          { hour: 5,  name: 'dawn',    sky: '#3a1410', skyTop: '#140606', light: '#ff8a5a', lightStrength: 0.5,  ambientSky: '#7a3022', ambientGround: '#2a100a', ambientStrength: 0.55, cloudLit: '#6a2a1a', cloudShade: '#200a08', stars: 0.4 },
+          { hour: 4,  name: 'night',   sky: '#2a0c08', skyTop: '#080202', light: '#ff8a5a', lightStrength: 0.6,  ambientSky: '#b0503a', ambientGround: '#6a2414', ambientStrength: 1.1,   cloudLit: '#3a1410', cloudShade: '#120606', stars: 0.8 },
+          { hour: 5,  name: 'dawn',    sky: '#3a1410', skyTop: '#140606', light: '#ff8a5a', lightStrength: 0.6,  ambientSky: '#a04432', ambientGround: '#5a2012', ambientStrength: 0.95, cloudLit: '#6a2a1a', cloudShade: '#200a08', stars: 0.4 },
           { hour: 6,  name: 'sunrise', sky: '#8a2e18', skyTop: '#3a1010', light: '#ffa060', lightStrength: 0.9,  ambientSky: '#c06040', ambientGround: '#3a1a10', ambientStrength: 0.75, cloudLit: '#c0582a', cloudShade: '#4a1810', stars: 0 },
           { hour: 8,  name: 'day',     sky: '#7a2a1c', skyTop: '#3c0e0c', light: '#ffd0a0', lightStrength: 1.5,  ambientSky: '#ffb090', ambientGround: '#4a2018', ambientStrength: 1.0,  cloudLit: '#a04a30', cloudShade: '#4a1a14', stars: 0 },
           { hour: 18, name: 'day',     sky: '#7a2a1c', skyTop: '#3c0e0c', light: '#ffd0a0', lightStrength: 1.5,  ambientSky: '#ffb090', ambientGround: '#4a2018', ambientStrength: 1.0,  cloudLit: '#a04a30', cloudShade: '#4a1a14', stars: 0 },
           { hour: 19.5, name: 'sunset', sky: '#9a3418', skyTop: '#2a0a0a', light: '#ff8040', lightStrength: 0.9, ambientSky: '#d06a40', ambientGround: '#3a1810', ambientStrength: 0.75, cloudLit: '#d06030', cloudShade: '#501a12', stars: 0 },
-          { hour: 21, name: 'dusk',    sky: '#3a0e0a', skyTop: '#100404', light: '#ff7a4a', lightStrength: 0.4,  ambientSky: '#7a2c20', ambientGround: '#200a08', ambientStrength: 0.7,  cloudLit: '#4a1a12', cloudShade: '#160606', stars: 0.6 },
-          { hour: 22, name: 'night',   sky: '#1a0806', skyTop: '#060102', light: '#ff7a4a', lightStrength: 0.35, ambientSky: '#7a2c20', ambientGround: '#2a0c08', ambientStrength: 0.75,  cloudLit: '#3a1410', cloudShade: '#120606', stars: 0.8 },
+          { hour: 21, name: 'dusk',    sky: '#3a0e0a', skyTop: '#100404', light: '#ff7a4a', lightStrength: 0.6,  ambientSky: '#a04432', ambientGround: '#5a2012', ambientStrength: 1.0,  cloudLit: '#4a1a12', cloudShade: '#160606', stars: 0.6 },
+          { hour: 22, name: 'night',   sky: '#2a0c08', skyTop: '#080202', light: '#ff8a5a', lightStrength: 0.6,  ambientSky: '#b0503a', ambientGround: '#6a2414', ambientStrength: 1.1,   cloudLit: '#3a1410', cloudShade: '#120606', stars: 0.8 },
         ],
         clouds: { coverage: 0.6 }, // smoky
 
-        // Closer than home, further than the water world: a medium-sized,
-        // fiery black hole (home's shape, just bigger).
-        blackHole: { size: 4.5, brightness: 1.3, glowAmount: 0.5 },
+        // The cracks cast a dim red-orange glow over the black glass around them.
+        glowLight: { strength: 0.8 },
+
+        // Closer than home, further than the water world: a medium-sized black hole.
+        blackHole: { size: 9 }, // black centre 18 degrees across, 22 with its ring
 
         ui: { '--page-bg': '#3a0e0a' },
       },
@@ -305,23 +297,27 @@ export const THEME = {
     },
   ],
   // The black hole every planet orbits, drawn into the sky in sky.js.
-  // A soft-edged dark hole at the centre of a big fiery whirlpool: thick
-  // spiral arms of gas, seen from above at an angle, swirling round and being
-  // sucked in. Dark red outside, orange in the middle, white-hot where it
-  // falls in. A soft glow spreads into the sky, and by day the sky around it
-  // darkens, as if it's swallowing the daylight. Stars and the galaxy band
-  // are bent around it. It sits high in the northern sky; at night the stars
-  // wheel around it.
+  // It looks like a hole: a big sharp-edged black centre with only a thin
+  // fiery ring hugging its edge (swirling gas, seen almost face-on, white-hot
+  // inside and dark red outside). Stars and the galaxy band are bent around
+  // it, with a faint beaded ring of bent starlight just outside the fire. By
+  // day the sky around it darkens, as if it's swallowing the daylight. It
+  // sits high in the northern sky; at night the stars wheel around it.
+  // It looks the same from every planet, just bigger from closer ones:
+  // each planet only sets its `size` (and maybe `brightness`) in THEME.planets.
   blackHole: {
     height: 40,                // degrees above the horizon
-    viewAngle: 55,             // how far above the whirlpool we see it from
-                               // (90 = straight down on it, 0 = edge-on)
+    viewAngle: 80,             // how far above the whirlpool we see it from
+                               // (90 = straight down on it, 0 = edge-on). Near face-on,
+                               // so the thin ring shows all the way round.
     tilt: 15,                  // degrees the whirlpool is turned on the sky
-    swirlSize: 2.5,            // outer edge of the whirlpool, in hole radii
-    swirlFadeStart: 0.6,       // the whirlpool fades out from this share of swirlSize to its edge
+    swirlSize: 1.25,           // outer edge of the fiery ring, in hole radii (1.25 = the
+                               // black centre is about 80% of the width)
+    swirlFadeStart: 0.9,       // the ring fades out from this share of swirlSize to its edge
                                // (bigger = it stays bright further out, then stops sooner)
-    edgeSoftness: 0.35,        // how blurry the hole's edge is, in hole radii (small = sharp edge)
-    gasFadeIn: [0.82, 1.15],   // the gas fades in between these distances (in hole radii).
+    edgeSoftness: 0.05,        // how blurry the hole's edge is, in hole radii (small = sharp edge)
+    gasFadeIn: [1.02, 1.05],   // the gas fades in between these distances (in hole radii):
+                               // right at the edge, so there's no gap and no gas over the black.
                                // Starting below 1 = on the near side it spills over the
                                // hole's edge, covering part of the black.
     armCount: 3,               // number of spiral arms
@@ -337,17 +333,19 @@ export const THEME = {
     nightBoost: 0.6,           // how much brighter the gas and glow get at night (0 = same as day)
     dayDarkening: 0.7,         // by day, how much the sky around it darkens (0 = not at all)
     dayDarkColor: '#1e0e16',   // the colour that patch of sky darkens towards
-    bendStrength: 5,           // how strongly it bends the light of stars behind it
+    bendStrength: 1.7,         // how strongly it bends the light of stars behind it. The faint
+                               // ring of bent starlight sits at the square root of this, in
+                               // hole radii (1.7 = just outside the fiery ring).
+    brightness: 1.8,           // 1 = normal, higher = more blazing
+    glowAmount: 0.03,          // how strongly its glow tints the sky around it (0 = none).
+                               // The glow grows with `size`: keep it low, or a big black
+                               // hole turns the whole night sky red.
 
-    // How it looks from home, the farthest planet: the smallest view (about
-    // 23 degrees across). Closer planets change these in THEME.planets, so
-    // it looks bigger there.
-    size: 2.6,                 // radius of the hole, in degrees of sky. The whirlpool
-                               // reaches swirlSize times further, the glow further still.
-    brightness: 1,             // 1 = normal, higher = more blazing
-    glowAmount: 1,             // how strongly its glow tints the sky around it (0 = none).
-                               // The glow grows with `size`: turn this down when the
-                               // black hole looks huge, or the whole night sky goes red.
+    // How it looks from home, the farthest planet: the smallest view (the
+    // black centre is about 10 degrees across, 13 with its ring). Closer
+    // planets set a bigger size in THEME.planets.
+    size: 5.2,                 // radius of the black centre, in degrees of sky. The ring
+                               // reaches swirlSize times further.
   },
   // Night sky (drawn into the sky in sky.js). Stars fade in through dusk.
   starfield: {
@@ -443,6 +441,12 @@ export const THEME = {
   // colour (no light at all) up to full brightness (open sky). An alien theme
   // could make this a faint glow, e.g. '#183020'.
   caveLight: '#2e2a30',
+
+  // Warm light that spills from glowing blocks (ember cracks, glow lamps) onto
+  // the blocks around them, even in the open and at night. Logic in chunkMesh.js.
+  //   strength: 0 = off (home), bigger = brighter
+  //   reach:    how many blocks away it fades to nothing
+  glowLight: { color: '#ff7a3a', strength: 0, reach: 6 },
 
   // How see-through water is (0 = invisible, 1 = solid colour).
   waterOpacity: 0.7,
@@ -567,9 +571,9 @@ export const THEME = {
     },
     // ---- Lava planet blocks ----
     blackGlass: {          // glassy black rock with a faint purple sheen
-      base: ['#1e1b24', '#232028', '#1a1720', '#26222c'],
-      sheen: '#3a3448',    // soft diagonal streaks of reflection
-      glint: '#8a7ca8',    // a few bright sparkles
+      base: ['#36303e', '#3c3644', '#322c3a', '#403a48'],
+      sheen: '#5a5068',    // soft diagonal streaks of reflection
+      glint: '#b0a0d0',    // a few bright sparkles
     },
     emberCrack: {          // molten rock glowing up through the cracks (always lit, even at night)
       glow: ['#ff7a1e', '#f26a16', '#ff8a2a'], // the orange glow

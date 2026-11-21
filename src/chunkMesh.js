@@ -15,11 +15,43 @@ import { bendMaterial } from './curve.js';
 //   3. Blocks that give off light (like the glow lamp) light up the air
 //      around them the same way, fading over LIGHT_SPREAD blocks.
 //   4. Each face is tinted by the light in the air just in front of it.
+//   5. Glowing blocks can also spill a warm glow onto the blocks around them
+//      (THEME.glowLight). Unlike sunlight, it shows even in the open and at
+//      night, like the lava planet's cracks lighting up the black glass.
+//      Off at home (strength 0), so nothing changes there.
 // This all happens once, when the chunk is built. It costs nothing per frame.
 
 // How many blocks sunlight spreads from open sky before it's fully dark.
 export const LIGHT_SPREAD = 5;
-const MARGIN = LIGHT_SPREAD; // look this far into neighbouring chunks, so light at edges is right
+
+// ---- Glow spilling from glowing blocks (THEME.glowLight) ----
+const GLOW = THEME.glowLight;
+const GLOW_ON = GLOW.strength > 0;
+const GLOW_REACH = GLOW.reach; // blocks until it fades to nothing
+
+// Look this far into neighbouring chunks, so light at the edges is right.
+const MARGIN = GLOW_ON ? Math.max(LIGHT_SPREAD, GLOW_REACH) : LIGHT_SPREAD;
+
+// Add the spilled glow to a material: each corner of a face carries how much
+// glow reaches it (0..1, the "glowLevel" attribute), and the material adds
+// that much warm light on top of the sun and sky, so it shows even at night.
+// Dark blocks get a little extra, so black glass still catches the glow.
+function addGlowLight(material) {
+  const bend = material.onBeforeCompile;
+  const color = new THREE.Color(GLOW.color).multiplyScalar(GLOW.strength);
+  material.onBeforeCompile = (shader, renderer) => {
+    bend(shader, renderer);
+    shader.uniforms.uGlowColor = { value: color };
+    shader.vertexShader = 'attribute float glowLevel;\nvarying float vGlowLevel;\n' + shader.vertexShader
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vGlowLevel = glowLevel;');
+    shader.fragmentShader = 'uniform vec3 uGlowColor;\nvarying float vGlowLevel;\n' + shader.fragmentShader
+      .replace('#include <emissivemap_fragment>',
+        '#include <emissivemap_fragment>\n  totalEmissiveRadiance += uGlowColor * vGlowLevel * (diffuseColor.rgb + 0.04);');
+  };
+  // Tell Three.js this shader differs from a plain bent one.
+  material.customProgramCacheKey = () => 'bend-glowlight';
+  return material;
+}
 
 // ---- Materials (shared by every chunk) ----
 const atlas = createAtlasTexture();
@@ -31,7 +63,7 @@ const MATERIALS = {
   // are simply not drawn, so you see through the gaps.
   cutout: bendMaterial(new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: 0.5 })),
   // Glowing blocks: ignore the sun and moon, so they look lit even at night.
-  glow: bendMaterial(new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true })),
+  glow: bendMaterial(new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true })), // already fully bright
   // Water: see-through all over. Drawn after everything solid, so you see the
   // sea floor through it. depthWrite: false = it never hides other water or
   // creatures behind it. DoubleSide = you see the surface from underneath too.
@@ -40,6 +72,8 @@ const MATERIALS = {
     depthWrite: false, side: THREE.DoubleSide,
   })),
 };
+// Blocks lit by the sun and sky also catch spilled glow (if it's on for this planet).
+if (GLOW_ON) [MATERIALS.opaque, MATERIALS.cutout, MATERIALS.water].forEach(addGlowLight);
 
 // ---- Brightness for each light level ----
 // Level 0 = THEME.caveLight (darkest), level LIGHT_SPREAD = full brightness.
@@ -137,6 +171,7 @@ class FaceList {
     this.positions = keep(this.positions, Float32Array, 12); // 4 corners x (x, y, z)
     this.normals = keep(this.normals, Float32Array, 12);
     this.colors = keep(this.colors, Float32Array, 12);
+    this.glows = keep(this.glows, Float32Array, 4);          // 4 corners x spilled glow
     this.uvs = keep(this.uvs, Float32Array, 8);              // 4 corners x (u, v)
     this.indices = keep(this.indices, Uint32Array, 6);       // 2 triangles x 3 corners
     this.capacity = faces;
@@ -148,7 +183,8 @@ class FaceList {
   }
 
   // [r, g, b] = the light tint. ao = shade level (0-3) for each of the 4 corners.
-  addFace(x, y, z, face, uv, [r, g, b], ao = NO_SHADE) {
+  // glow = how much spilled glow reaches this face (0..1, see THEME.glowLight).
+  addFace(x, y, z, face, uv, [r, g, b], ao = NO_SHADE, glow = 0) {
     if (this.faces === this.capacity) this.grow(this.capacity * 2);
     const n = this.faces++;
     const first = n * 4; // index of this face's first corner
@@ -165,6 +201,7 @@ class FaceList {
       this.colors[p] = r * shade;
       this.colors[p + 1] = g * shade;
       this.colors[p + 2] = b * shade;
+      this.glows[first + k] = glow;
     }
     // Corners are bottom-left, bottom-right, top-left, top-right.
     const t = n * 8;
@@ -197,6 +234,7 @@ class FaceList {
     geometry.setAttribute('normal', new THREE.BufferAttribute(this.normals.slice(0, n * 12), 3));
     geometry.setAttribute('uv', new THREE.BufferAttribute(this.uvs.slice(0, n * 8), 2));
     geometry.setAttribute('color', new THREE.BufferAttribute(this.colors.slice(0, n * 12), 3));
+    if (GLOW_ON) geometry.setAttribute('glowLevel', new THREE.BufferAttribute(this.glows.slice(0, n * 4), 1));
     // Corner numbers fit in the smaller 16-bit kind unless a chunk has over 16,383 faces.
     const indices = n * 4 <= 65536 ? Uint16Array.from(this.indices.subarray(0, n * 6)) : this.indices.slice(0, n * 6);
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
@@ -211,7 +249,7 @@ const LISTS = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceLi
 // Building a chunk needs a few big temporary arrays. Making new ones every
 // time creates lots of garbage for the browser to clean up (which can cause
 // small hitches), so the same arrays are reused. They grow if ever needed.
-const scratch = { blocks: null, light: null, queue: null, skyTop: null };
+const scratch = { blocks: null, light: null, glow: null, queue: null, skyTop: null };
 function scratchArray(name, Type, length) {
   if (!scratch[name] || scratch[name].length < length) scratch[name] = new Type(length);
   return scratch[name];
@@ -324,10 +362,56 @@ function computeLight({ blocks, size, layer }, worldHeight) {
   return light;
 }
 
+// ---- Step 2b: spilled glow from glowing blocks (only if THEME.glowLight is on) ----
+// Like sunlight spreading into caves: starts at each glowing block and gets
+// one step dimmer per block of open space, until GLOW_REACH blocks away.
+function computeGlow({ blocks, layer, size }, worldHeight) {
+  const total = layer * worldHeight;
+  const glow = scratchArray('glow', Uint8Array, total);
+  glow.fill(0, 0, total);
+  const queue = scratchArray('queue', Int32Array, total);
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < total; i++) {
+    if (EMITS_LIGHT[blocks[i]]) {
+      glow[i] = GLOW_REACH + 1;
+      queue[tail++] = i;
+    }
+  }
+  while (head < tail) {
+    const i = queue[head++];
+    const next = glow[i] - 1;
+    if (next <= 0) continue;
+    const y = Math.floor(i / layer);
+    const col = i - y * layer;
+    const rz = Math.floor(col / size);
+    const rx = col - rz * size;
+    const tryCell = (j) => {
+      if (glow[j] < next && !BLOCKS_LIGHT[blocks[j]]) {
+        glow[j] = next;
+        queue[tail++] = j;
+      }
+    };
+    if (rx > 0) tryCell(i - 1);
+    if (rx < size - 1) tryCell(i + 1);
+    if (rz > 0) tryCell(i - size);
+    if (rz < size - 1) tryCell(i + size);
+    if (y > 0) tryCell(i - layer);
+    if (y < worldHeight - 1) tryCell(i + layer);
+  }
+  return glow;
+}
+
+// Glow level (0..GLOW_REACH) -> how strong it looks. Squared, so it fades
+// gently at the edges and is brightest right next to the glowing block.
+const GLOW_AMOUNT = Array.from({ length: GLOW_REACH + 2 }, (_, level) =>
+  Math.min(1, level / GLOW_REACH) ** 2);
+
 // ---- Step 3: build the faces ----
 export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
   const region = copyRegion(world, chunk, chunkSize, worldHeight);
   const light = computeLight(region, worldHeight);
+  const glow = GLOW_ON ? computeGlow(region, worldHeight) : null;
   const { blocks, size, layer } = region;
 
   const ox = chunk.cx * chunkSize; // chunk's position in the world, in blocks
@@ -387,7 +471,7 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
           const tint = BRIGHTNESS[light[n]];
           // Glowing blocks and water are never shaded; everything else gets soft corner shadows.
           if (!AO_ON || list === lists.glow || list === lists.water) {
-            list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint);
+            list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint, NO_SHADE, glow ? GLOW_AMOUNT[glow[n]] : 0);
             continue;
           }
           const steps = aoStep[f];
@@ -399,7 +483,7 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
             // Both sides solid = deepest corner, even if the diagonal is open.
             ao[k] = a && b ? 0 : 3 - a - b - solidAt(i, y, steps[j + 2], dys[j + 2]);
           }
-          list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint, ao);
+          list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint, ao, glow ? GLOW_AMOUNT[glow[n]] : 0);
         }
       }
     }
