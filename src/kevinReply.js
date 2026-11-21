@@ -1,13 +1,15 @@
 import { offlineReply } from './kevinBrain.js';
+import { isAction } from './kevinActions.js';
 import { getKevinName } from './kevinName.js';
 
 // ==========================================================
 //  askKevin(): THE ONE PLACE KEVIN'S CHAT REPLIES COME FROM.
 //
 //  It asks Kevin's online brain (the Supabase Edge Function "kevin", which
-//  calls Claude) and returns a promise of { text, mood }:
-//    text  what he says
-//    mood  'talking', or 'annoyed' (his face while he says it)
+//  calls Claude) and returns a promise of { text, mood, action }:
+//    text    what he says
+//    mood    'talking', or 'annoyed' (his face while he says it)
+//    action  something to DO, e.g. 'stay' (see kevinActions.js), or null
 //
 //  If the server can't be used, it falls back to the offline brain
 //  (kevinBrain.js), so the game never breaks:
@@ -32,7 +34,7 @@ const history = [];
 // `context` = a few facts about the game right now (see kevinChat.js).
 export async function askKevin(message, context) {
   message = message.slice(0, MAX_MESSAGE_LENGTH);
-  const answer = (await askServer(message, context)) ?? (await askOffline(message));
+  const answer = (await askServer(message, context)) ?? (await askOffline(message, context));
   remember('player', message);
   remember('kevin', answer.text);
   return answer;
@@ -43,7 +45,7 @@ export function isOnlineBrainConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
-// The online brain. Returns { text, mood }, or null if it didn't work.
+// The online brain. Returns { text, mood, action }, or null if it didn't work.
 async function askServer(message, context) {
   if (!isOnlineBrainConfigured()) return null;
   const controller = new AbortController();
@@ -68,6 +70,7 @@ async function askServer(message, context) {
     return {
       text: data.text.trim().slice(0, MAX_MESSAGE_LENGTH),
       mood: data.mood === 'annoyed' ? 'annoyed' : 'talking',
+      action: isAction(data.action) ? data.action : null, // only actions the game knows
     };
   } catch (err) {
     console.warn('Kevin\'s online brain is unreachable; using the offline brain.', err.name === 'AbortError' ? '(timed out)' : err);
@@ -78,10 +81,10 @@ async function askServer(message, context) {
 }
 
 // The offline brain, after a short pause so it feels like he's thinking.
-async function askOffline(message) {
+async function askOffline(message, context) {
   const [a, b] = OFFLINE_THINKING;
   await new Promise((resolve) => setTimeout(resolve, (a + Math.random() * (b - a)) * 1000));
-  return offlineReply(message);
+  return offlineReply(message, { staying: Boolean(context?.kevinStaying) });
 }
 
 function remember(from, text) {

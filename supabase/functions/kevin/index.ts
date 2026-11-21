@@ -2,7 +2,12 @@
 //
 // The game sends what the player typed, plus a little game context and the
 // last few chat messages. This function asks Claude (claude-haiku-5-5) for
-// Kevin's reply and sends back { text, mood }.
+// Kevin's reply and sends back { text, mood, action }.
+//
+// action: if the player asked Kevin to DO something he can do ("stay here"),
+// Claude adds a tag like [do:stay] and this sends back "stay". Only names in
+// ACTIONS are ever sent; otherwise action is null. (The game checks again,
+// see src/kevinActions.js.)
 //
 // The Anthropic API key lives ONLY here, as the Edge Function secret
 // ANTHROPIC_API_KEY. It is never sent to the browser.
@@ -14,13 +19,16 @@ import Anthropic from "npm:@anthropic-ai/sdk@1.12.0";
 
 // ---- Safety limits ----
 const MODEL = "claude-haiku-5-5";
-const MAX_TOKENS = 80;           // replies are one or two short sentences
+const MAX_TOKENS = 90;           // replies are one or two short sentences (plus the tags)
 const MAX_REPLY_WORDS = 40;      // a longer reply is trimmed (at a sentence end if possible)
 const MAX_MESSAGE_LENGTH = 300;  // longer messages are rejected
 const MAX_HISTORY = 6;           // only the last few chat messages are sent
 const MAX_NAME_LENGTH = 16;
 const MAX_CONTEXT_TEXT = 80;     // each piece of game context is cut to this length
 const RATE_LIMIT = 12;           // messages per minute from one address (best effort)
+
+// Things Kevin can actually do (keep in step with src/kevinActions.js).
+const ACTIONS = ["stay", "follow"];
 
 // Lets the browser call this function from the game's page.
 const CORS_HEADERS = {
@@ -74,6 +82,7 @@ function systemPrompt(name: string, context: Record<string, unknown>): string {
     ["Creatures nearby", cleanText(context.nearbyCreatures, MAX_CONTEXT_TEXT)],
     ["Recent events", cleanText(context.recentEvents, MAX_CONTEXT_TEXT * 3)],
     ["Game mode", cleanText(context.mode, MAX_CONTEXT_TEXT)],
+    ["What you're doing", cleanText(context.kevinState, MAX_CONTEXT_TEXT)],
   ].filter(([, value]) => value);
 
   return `You are ${name}, a small robot companion who follows the player around a blocky alien planet. You are tall and boxy, with a TV-screen face and a little antenna.
@@ -88,6 +97,12 @@ How to reply:
 - Never mention Minecraft or any other game, and never say you are an AI model or Claude. You are ${name}, the robot.
 - Keep it friendly enough for all ages. If the player is rude, be sarcastic back, never cruel.
 - Start every reply with a mood tag: [talking] normally, or [annoyed] if the player was rude or is pestering you. Then the reply.
+
+Things you can actually do. When the player clearly asks for one, put its action tag right after the mood tag, then reply in character (e.g. "[talking][do:stay] Staying put. Do come back."):
+- [do:stay] stay right where you are and stop following (e.g. "stay here", "wait for me", "stop following me")
+- [do:follow] follow the player again (e.g. "follow me", "come here", "let's go")
+Use at most one action tag, and only when the player asks for that. If you're already doing it, you can say so, but still add the tag.
+You can't do anything else yet: no building, digging, fighting, fetching, crafting or flying. If asked, say no politely, in character, with no action tag. Never pretend to do something you have no tag for.
 
 What you can see right now:
 ${facts.map(([label, value]) => `- ${label}: ${value}`).join("\n") || "- Nothing special."}`;
@@ -145,7 +160,9 @@ Deno.serve(async (req) => {
       if (block.type === "text") text += block.text;
     }
     const mood = /^\s*\[annoyed\]/i.test(text) ? "annoyed" : "talking";
-    text = limitWords(cleanText(text.replace(/\[(talking|annoyed)\]/gi, ""), MAX_MESSAGE_LENGTH));
+    const tag = text.match(/\[do:\s*([a-z]+)\s*\]/i)?.[1]?.toLowerCase() ?? "";
+    const action = ACTIONS.includes(tag) ? tag : null;
+    text = limitWords(cleanText(text.replace(/\[(talking|annoyed|do:[^\]]*)\]/gi, ""), MAX_MESSAGE_LENGTH));
     // Ran out of room mid-sentence? Keep only the finished sentences.
     if (response.stop_reason === "max_tokens") {
       const end = Math.max(text.lastIndexOf("."), text.lastIndexOf("!"), text.lastIndexOf("?"));
@@ -153,7 +170,7 @@ Deno.serve(async (req) => {
     }
     if (!text) return reply({ error: "No reply" }, 502);
 
-    return reply({ text, mood });
+    return reply({ text, mood, action });
   } catch (error) {
     // Log the details here (visible in the Supabase dashboard), but don't send them to the browser.
     if (error instanceof Anthropic.APIError) console.error(`Claude API error ${error.status}:`, error.message);

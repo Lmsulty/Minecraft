@@ -30,6 +30,13 @@ import { KevinTag } from './kevinTag.js';
 // He also teleports if he's been stuck, if he can't get any closer for a
 // while, or if you're far above or below him (up a tower, down a pit).
 // So he can never get lost.
+//
+// Unless you tell him to STAY (in the chat, see kevinActions.js): then he
+// stands right where he is, watching you, and never follows or teleports,
+// however far you go. He still shuffles aside if he's in your way. If you go
+// so far that his patch of ground unloads, he just waits there, frozen,
+// until you come back. Tell him to FOLLOW and he's back to normal (and
+// teleports to you if you're far away).
 
 // ==========================================================
 //  PERSONAL SPACE: tweak these to change how close he stays.
@@ -162,6 +169,7 @@ export class Kevin {
     };
 
     this.mode = 'idle';       // 'idle', 'follow' or 'backoff'
+    this.staying = false;     // true = you told him to stay put (kevinActions.js)
     this.mood = 'idle';       // face to show: 'idle' or 'thinking' (talking and annoyed win over these)
     this.talking = false;     // set by kevinTalk.js while he's saying something
     this.clock = 0;           // seconds since the game started (for the antenna blink)
@@ -187,6 +195,22 @@ export class Kevin {
     this.events = [];  // things that happened, for kevinTalk.js: 'hit', 'teleport' (not the first arrival)
   }
 
+  // ---- Orders from the chat (kevinActions.js) ----
+
+  // Stand still right here until told to follow.
+  stay() {
+    this.staying = true;
+    this.mode = 'idle';
+    this.stuckTime = 0;
+    this.progressTime = 0;
+    this.heightTime = 0;
+  }
+
+  // Back to following you around (checkLost() teleports him if you're far away).
+  follow() {
+    this.staying = false;
+  }
+
   // What's happened since last asked (and forget them).
   takeEvents() {
     const events = this.events;
@@ -209,7 +233,14 @@ export class Kevin {
       return;
     }
     // The ground under HIM unloaded (you went far away): come back.
-    if (!this.world.isLoadedAt(b.position.x, b.position.z)) this.teleport();
+    // Unless he's staying: then he waits right there until it loads again.
+    if (!this.world.isLoadedAt(b.position.x, b.position.z)) {
+      if (this.staying) {
+        this.draw(dt);
+        return;
+      }
+      this.teleport();
+    }
 
     const startX = b.position.x;
     const startZ = b.position.z;
@@ -260,10 +291,14 @@ export class Kevin {
     const toPlayer = angleTowards(b.position.x, b.position.z, p.x, p.z);
 
     // Switch modes. The gaps between the numbers stop him flicking back and forth.
-    if (this.mode === 'follow' && distance < STOP_FOLLOWING) this.mode = 'idle';
-    else if (this.mode !== 'follow' && distance > START_FOLLOWING) this.startFollowing();
-    if (this.mode === 'idle' && distance < TOO_CLOSE) this.mode = 'backoff';
-    if (this.mode === 'backoff' && distance > BACK_OFF_TO) this.mode = 'idle';
+    if (this.staying) {
+      this.mode = 'idle'; // told to stay: no following, no backing off
+    } else {
+      if (this.mode === 'follow' && distance < STOP_FOLLOWING) this.mode = 'idle';
+      else if (this.mode !== 'follow' && distance > START_FOLLOWING) this.startFollowing();
+      if (this.mode === 'idle' && distance < TOO_CLOSE) this.mode = 'backoff';
+      if (this.mode === 'backoff' && distance > BACK_OFF_TO) this.mode = 'idle';
+    }
 
     let speed = 0;
     if (this.shuffleTimer > 0) {
@@ -415,6 +450,15 @@ export class Kevin {
   checkLost(dt, moved) {
     const b = this.body;
     const p = this.player.position;
+
+    // Told to stay: never teleport to you (only if he somehow falls out of the world).
+    if (this.staying) {
+      this.stuckTime = 0;
+      this.progressTime = 0;
+      this.heightTime = 0;
+      if (b.position.y < -30) this.teleport();
+      return;
+    }
     const distance = Math.hypot(p.x - b.position.x, p.z - b.position.z);
 
     // Stuck: trying to follow, but hardly moving.

@@ -1,4 +1,5 @@
 import { askKevin, isOnlineBrainConfigured } from './kevinReply.js';
+import { runAction } from './kevinActions.js';
 import { getKevinName } from './kevinName.js';
 import { displayName } from './items.js';
 
@@ -14,7 +15,8 @@ import { displayName } from './items.js';
 // shows his thinking face; then he says it like any other line (speech
 // bubble, caption if he's out of sight, and voice), through kevinTalk.js.
 //
-// The reply itself comes from askKevin() in kevinReply.js.
+// The reply itself comes from askKevin() in kevinReply.js. If it comes with
+// an action ("stay here", "follow me"), kevinActions.js makes him do it.
 
 const MAX_MESSAGE_LENGTH = 300;
 const LOG_LENGTH = 6; // messages shown in the box
@@ -93,6 +95,9 @@ export class KevinChat {
         this.kevin.mood = 'idle';
         this.addToLog(getKevinName(), answer.text);
         this.talk.say(answer); // bubble, caption and voice, like his other lines
+        // An order ("stay here")? Do it, and remember it for later chats.
+        const note = runAction(answer.action, this.kevin);
+        if (note) this.talk.note(note);
       });
   }
 
@@ -138,6 +143,8 @@ export class KevinChat {
       nearbyCreatures: creatures || 'none',
       recentEvents: this.talk.recentEventsText() || 'nothing much',
       mode: this.inventory.creative ? 'creative (unlimited blocks)' : 'survival',
+      kevinState: this.kevin.staying ? 'staying put where the player told you to' : 'following the player',
+      kevinStaying: this.kevin.staying, // for the offline brain
     };
   }
 }

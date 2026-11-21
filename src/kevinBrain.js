@@ -1,4 +1,5 @@
 import { getKevinName } from './kevinName.js';
+import { findAction } from './kevinActions.js';
 
 // Kevin's OFFLINE BRAIN: canned lines, picked to suit the moment.
 //
@@ -15,7 +16,8 @@ import { getKevinName } from './kevinName.js';
 //
 // Two kinds of lines:
 //   EVENT lines:  things he says on his own (kevinTalk.js decides when)
-//   REPLY lines:  answers to what you type in the chat (when the online brain is unavailable)
+//   REPLY lines:  answers to what you type in the chat (when the online brain is unavailable),
+//                 including orders like "stay here" (kevinActions.js spots those)
 
 const LINES = {
   // ---- Things he says on his own ----
@@ -150,6 +152,41 @@ const LINES = {
     'The black hole? Up north. Perfectly fine. Probably.',
     'Everything orbits it. Including us. I\'d rather not dwell on it.',
   ],
+
+  // ---- Orders (kevinActions.js) ----
+
+  // You told him to stay.
+  stay: [
+    'Staying put. Do come back, won\'t you?',
+    'Right here. I shan\'t move a bolt.',
+    'Fine. I\'ll guard this exact patch of nothing.',
+    'Waiting. It\'s what I do best. Apart from being right.',
+  ],
+  // ...but he already was.
+  alreadyStaying: [
+    'I am staying. Look at me, not moving at all.',
+    'Still here. Still not moving. Riveting stuff.',
+  ],
+  // You told him to follow.
+  follow: [
+    'Coming. Do try not to walk into anything.',
+    'Right behind you. As ever.',
+    'Following. Lead on, if you must.',
+    'Off we go, then. Mind the holes.',
+  ],
+  // ...but he already was.
+  alreadyFollowing: [
+    'I am following you. That\'s rather my whole job.',
+    'Already on your heels. Have you not noticed?',
+  ],
+  // You asked for something he can't do (yet).
+  cantDo: [
+    'I\'d love to. Well, no. But I can\'t anyway.',
+    'Not my department, I\'m afraid. I stand about and follow.',
+    'Sadly beyond my abilities. I\'m more of a supervisor.',
+    'I\'d rather not. Mostly because I can\'t.',
+  ],
+
   unknown: [
     'Fascinating. Truly. Anyway.',
     'I heard you. I\'m choosing not to process that.',
@@ -164,6 +201,7 @@ const TOPICS = [
   { topic: 'insult', words: /\b(stupid|dumb|idiot|useless|ugly|hate you|shut up|loser|trash|bad robot|annoying)\b/ },
   { topic: 'thanks', words: /\b(thanks|thank you|thx|ty|cheers)\b/ },
   { topic: 'help', words: /\b(help|how do i|how to|what do i|stuck|lost|tip|hint|confused)\b/ },
+  { topic: 'cantDo', words: /\b(build|dig|make me|craft me|fetch|get me|bring me|attack|kill|fight|destroy|knock down|fly)\b/ },
   { topic: 'blackHoleQuestion', words: /\b(black ?hole|hole in the sky|swirl)\b/ },
   { topic: 'night', words: /\b(night|dark|scared|afraid)\b/ },
   { topic: 'howAreYou', words: /\b(how are you|how r u|how's it going|you ok|you good)\b/ },
@@ -192,13 +230,21 @@ export function pickLine(kind, count = 0) {
   };
 }
 
-// The offline answer to something you typed. Returns { text, mood }.
-// (The chat in step 3 goes through askKevin() in kevinReply.js, which uses
-// this when the server isn't available.)
-export function offlineReply(message) {
+// The offline answer to something you typed. Returns { text, mood, action }
+// (action = one of kevinActions.js's names, or null).
+// `staying` = is he staying put right now (so he can say "I already am").
+// (The chat goes through askKevin() in kevinReply.js, which uses this when
+// the server isn't available.)
+export function offlineReply(message, { staying = false } = {}) {
   const text = message.toLowerCase();
+
+  // An order? (Checked first: "stop following me, you idiot" is still an order.)
+  const action = findAction(text);
+  if (action === 'stay') return { ...pickLine(staying ? 'alreadyStaying' : 'stay'), action };
+  if (action === 'follow') return { ...pickLine(staying ? 'follow' : 'alreadyFollowing'), action };
+
   // Saying his name on its own counts as a hello.
-  if (text.trim() === getKevinName().toLowerCase()) return pickLine('greeting');
+  if (text.trim() === getKevinName().toLowerCase()) return { ...pickLine('greeting'), action: null };
   const match = TOPICS.find(({ words }) => words.test(text));
-  return pickLine(match ? match.topic : 'unknown');
+  return { ...pickLine(match ? match.topic : 'unknown'), action: null };
 }
