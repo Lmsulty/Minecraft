@@ -49,8 +49,8 @@ function groundLevel(world, x, z, nearY) {
 }
 
 // Every natural block of the tree that block (x, y, z) belongs to, or just
-// that block if it isn't part of a generated tree.
-function wholeTree(world, x, y, z) {
+// that block if it isn't part of a generated tree. (Digging uses it too: kevinDig.js.)
+export function wholeTree(world, x, y, z) {
   const id = world.getBlock(x, y, z);
   const tree = treeAtColumn(world.terrain, x, z);
   if (!tree || treeBlockAt(tree, x, y, z) !== id) return [{ x, y, z, id }];

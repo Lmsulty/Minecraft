@@ -128,7 +128,10 @@ const kevinTalk = new KevinTalk(kevin, player, dayNight, camera,
   new KevinCaption(document.getElementById('kevin-caption')), kevinVoice);
 
 // ---- Kevin building things you ask for in the chat (kevinBuild.js) ----
-const kevinBuilder = new KevinBuilder({ kevin, world, player, inventory, talk: kevinTalk, scene });
+const kevinBuilder = new KevinBuilder({
+  kevin, world, player, inventory, talk: kevinTalk, scene,
+  aim: (reach) => interaction.raycast(reach), // where you're pointing (he looks further than you can reach)
+});
 
 // ---- Chatting with Kevin: press Enter (kevinChat.js; replies from askKevin() in kevinReply.js) ----
 new KevinChat(document.getElementById('kevin-chat'), {

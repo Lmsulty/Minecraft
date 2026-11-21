@@ -15,12 +15,13 @@
 // Actions:
 //   stay    stand still right where he is: no following, no teleporting to you
 //   follow  back to normal: follow you around
-//   stop    stop building
+//   stop    stop building or digging
 //   wall, tower, hut, bridge   build one (kevinBlueprints.js has the sizes)
 //   light   put glow lamps on the ground around you
-// (Digging comes in the next step.)
+//   tunnel  dig a tunnel straight ahead (kevinDig.js)
+//   stairs  dig a staircase going down (kevinDig.js)
 
-export const ACTIONS = ['stay', 'follow', 'stop', 'wall', 'tower', 'hut', 'bridge', 'light'];
+export const ACTIONS = ['stay', 'follow', 'stop', 'wall', 'tower', 'hut', 'bridge', 'light', 'tunnel', 'stairs'];
 
 // Keywords for the offline brain. Checked in order; first match wins.
 // 'stay' goes first so "stop following me" and "don't follow me" mean stay,
@@ -33,6 +34,9 @@ const ACTION_WORDS = [
   { action: 'bridge', words: /\b(bridge|walkway)\b/ },
   { action: 'wall', words: /\b(wall|barrier|fence)\b/ },
   { action: 'light', words: /\b(lights?|lamps?|lanterns?|brighten)\b/ },
+  // "tunnel" before "dig", so "dig a tunnel" is a tunnel and plain "dig" means down.
+  { action: 'tunnel', words: /\b(tunnel|dig (forward|ahead|straight|through|into))\b/ },
+  { action: 'stairs', words: /\b(dig|stairs|staircase|steps down|mine down|go down|downstairs)\b/ },
   { action: 'follow', words: /\b(follow|come (here|on|with me|back|along)|let'?s go|keep up|heel)\b/ },
 ];
 
@@ -69,5 +73,8 @@ export function runAction(action, { kevin, builder }) {
   const plan = builder.plan(action);
   if (!plan.ok) return { line: plan.line, note: `Kevin couldn't do the ${action} the player asked for` };
   builder.start(plan.job);
-  return { note: action === 'light' ? 'the player asked Kevin to put up lamps' : `the player asked Kevin to build a ${action}` };
+  if (action === 'light') return { note: 'the player asked Kevin to put up lamps' };
+  if (action === 'tunnel') return { note: 'the player asked Kevin to dig a tunnel' };
+  if (action === 'stairs') return { note: 'the player asked Kevin to dig a staircase down' };
+  return { note: `the player asked Kevin to build a ${action}` };
 }

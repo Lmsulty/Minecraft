@@ -204,6 +204,52 @@ const LINES = {
     'There. Now you can see what you\'re falling into.',
     'All lit. Rather cosy, actually.',
   ],
+  // You asked him to dig ({thing} = tunnel or staircase).
+  dig: [
+    'Digging a {thing}. Do mind your feet.',
+    'A {thing}? Down into the dark we go. Lovely.',
+    'Right. One {thing}, coming up. Well, down.',
+    'Digging. Someone has to get their hands dirty. Metaphorically.',
+  ],
+  // He finished digging, with lamps.
+  dug: [
+    'There\'s your {thing}. Lamps included. After you.',
+    'Done. One {thing}, freshly dug and nicely lit.',
+    'Your {thing} is ready. I even put the lights on.',
+  ],
+  // He finished digging, but had no lamps to put in.
+  dugDark: [
+    'There\'s your {thing}. It\'s pitch black, mind. You had no lamps.',
+    'Done. Rather dark in there. Craft some glow lamps next time.',
+  ],
+  // He stopped early because your blocks were in the way.
+  dugShort: [
+    'Done. I stopped where your blocks start. I don\'t touch those.',
+    'I hit something of yours, so the {thing} ends there.',
+  ],
+  // Asked for a tunnel, but you're not pointing at a hillside or wall.
+  pointAtHill: [
+    'Point me at a hill, would you? I can\'t tunnel through air.',
+    'Tunnel into what, exactly? Aim at a hillside or a wall first.',
+    'Show me some rock to dig into. Point at it, then ask again.',
+  ],
+  // A job ended having changed nothing at all ({thing}).
+  jobFailed: [
+    'Well, that didn\'t work. Nothing went where it should. Try another spot?',
+    'I\'m afraid the {thing} didn\'t happen. Something kept getting in the way.',
+    'Not a single block. Rather embarrassing. Let\'s try somewhere else.',
+  ],
+  // A job only partly worked: {count} of {planned} blocks.
+  jobPartial: [
+    'I only managed {count} of {planned} blocks. Something kept getting in the way.',
+    'That {thing} is rather unfinished, I\'m afraid. {count} of {planned} blocks.',
+  ],
+  // Nothing to dig: it's all air ahead.
+  nothingToDig: [
+    'Dig what? There\'s nothing there but air.',
+    'It\'s already empty. Even I can\'t dig air.',
+  ],
+
   // You told him to stop building.
   stop: [
     'Stopping. Half a masterpiece it is, then.',
@@ -264,7 +310,7 @@ const LINES = {
   // You said build, but not what.
   buildWhat: [
     'Build what? A wall, a tower, a hut or a bridge. Do be specific.',
-    'I do walls, towers, huts and bridges. Pick one.',
+    'I do walls, towers, huts and bridges. Tunnels and stairs too. Pick one.',
   ],
 
   // You asked for something he can't do (yet).
@@ -289,7 +335,7 @@ const TOPICS = [
   { topic: 'insult', words: /\b(stupid|dumb|idiot|useless|ugly|hate you|shut up|loser|trash|bad robot|annoying)\b/ },
   { topic: 'thanks', words: /\b(thanks|thank you|thx|ty|cheers)\b/ },
   { topic: 'help', words: /\b(help|how do i|how to|what do i|stuck|lost|tip|hint|confused)\b/ },
-  { topic: 'cantDo', words: /\b(dig|tunnel|craft me|fetch|get me|bring me|attack|kill|fight|destroy|knock down|fly)\b/ },
+  { topic: 'cantDo', words: /\b(craft me|fetch|get me|bring me|attack|kill|fight|destroy|knock down|fly)\b/ },
   { topic: 'buildWhat', words: /\b(build|make)\b/ },
   { topic: 'blackHoleQuestion', words: /\b(black ?hole|hole in the sky|swirl)\b/ },
   { topic: 'night', words: /\b(night|dark|scared|afraid)\b/ },
@@ -336,6 +382,8 @@ export function offlineReply(message, { staying = false, busy = false } = {}) {
   if (action === 'follow') return { ...pickLine(staying ? 'follow' : 'alreadyFollowing'), action };
   if (action === 'stop') return { ...pickLine(busy ? 'stop' : 'nothingToStop'), action };
   if (action === 'light') return { ...pickLine('lightUp'), action };
+  if (action === 'tunnel') return { ...pickLine('dig', 0, { thing: 'tunnel' }), action };
+  if (action === 'stairs') return { ...pickLine('dig', 0, { thing: 'staircase' }), action };
   if (action) return { ...pickLine('build', 0, { thing: action }), action }; // wall, tower, hut, bridge
 
   // Saying his name on its own counts as a hello.

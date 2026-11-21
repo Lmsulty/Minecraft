@@ -5,10 +5,13 @@ import { THEME } from './theme.js';
 import { bendMaterial } from './curve.js';
 import { blueprint, MAIN } from './kevinBlueprints.js';
 import { findSite } from './kevinSite.js';
+import { digPlan } from './kevinDig.js';
 import { pickLine } from './kevinBrain.js';
 
 // Kevin BUILDING things you ask for in the chat (wall, tower, hut, bridge,
-// lamps). kevinBlueprints.js says where the blocks go; this file:
+// lamps), and DIGGING them (tunnel, staircase down: kevinDig.js plans those,
+// and they're done just like clearing a spot, with lamps placed after).
+// kevinBlueprints.js says where the blocks go; this file:
 //
 //   1. picks the block to build with:
 //        the block you're holding, if it's a block
@@ -41,19 +44,38 @@ const GIVE_UP_DISTANCE = 24; // you walked this far away: he stops
 const POP_TIME = 0.3;       // seconds the sparkle round a new block lasts
 const BEAM_TIME = 0.12;     // seconds the beam from his antenna lasts
 const POP_COUNT = 6;        // sparkles that can show at once
+const AIM_REACH = 8;        // how far away he looks for the block you're pointing at
+const MOSTLY_DONE = 0.5;    // changed fewer than this share of the planned blocks: he admits it didn't work
 // ==========================================================
 
 // Names for his lines ("One {thing}, coming up").
-const THINGS = { wall: 'wall', tower: 'tower', hut: 'hut', bridge: 'bridge', light: 'lamps' };
+export const THINGS = {
+  wall: 'wall', tower: 'tower', hut: 'hut', bridge: 'bridge', light: 'lamps',
+  tunnel: 'tunnel', stairs: 'staircase',
+};
 export const BUILDS = Object.keys(THINGS);
 const SITE_BUILDS = ['wall', 'tower', 'hut']; // these need a spot found (and maybe cleared) first
+const DIGS = ['tunnel', 'stairs'];            // these are dug (kevinDig.js)
 
 function blockName(id) {
   return displayName(id).toLowerCase();
 }
 
+// A job: blocks to clear (dig out) first, then blocks to place.
+// `changed` counts the blocks he really removed or placed, so he never says
+// "done" when nothing (or hardly anything) happened.
+function newJob(kind, clear, blocks, doneLine = null) {
+  return {
+    kind, clear, nextClear: 0, blocks, next: 0, timer: 0, doneLine,
+    changed: 0, planned: clear.length + blocks.length,
+  };
+}
+
 export class KevinBuilder {
-  constructor({ kevin, world, player, inventory, talk, scene }) {
+  // `aim(reach)` = the block you're pointing at, up to `reach` away, with the
+  // face you hit (interaction.js raycast), or null.
+  constructor({ kevin, world, player, inventory, talk, scene, aim }) {
+    this.aimAt = () => aim?.(AIM_REACH) ?? null;
     this.kevin = kevin;
     this.world = world;
     this.player = player;
@@ -93,7 +115,8 @@ export class KevinBuilder {
   // What he's doing, for the online brain ("building a hut").
   describe() {
     if (!this.job) return null;
-    return this.job.kind === 'light' ? 'putting up glow lamps' : `building a ${THINGS[this.job.kind]}`;
+    if (this.job.kind === 'light') return 'putting up glow lamps';
+    return `${DIGS.includes(this.job.kind) ? 'digging' : 'building'} a ${THINGS[this.job.kind]}`;
   }
 
   // ---- 1 and 2: plan it, and check it can be done ----
@@ -118,13 +141,24 @@ export class KevinBuilder {
   plan(kind) {
     const inv = this.inventory;
     const refuse = (lineKind, count = 0, fill = {}) => ({ ok: false, line: pickLine(lineKind, count, fill) });
+    const aim = this.aimAt(); // the block you're pointing at right now (up to AIM_REACH away), or null
+
+    // Digging: nothing needed but lamps, and those are optional (as many as you have).
+    if (DIGS.includes(kind)) {
+      const lamps = inv.creative ? Infinity : inv.countOf(BLOCK.GLOW_LAMP);
+      const dig = digPlan(kind, { world: this.world, player: this.player, aim, lamps });
+      if (!dig.ok) return refuse(dig.reason);
+      // What he says when he's done: stopped at your blocks > no lamps > all good.
+      const doneLine = dig.short ? 'dugShort' : dig.lamps.length === 0 ? 'dugDark' : 'dug';
+      return { ok: true, job: newJob(kind, dig.dig, dig.lamps, doneLine) };
+    }
 
     // Walls, towers and huts: find (and maybe clear) a spot. Bridges and lamps: no clearing.
     const onSite = SITE_BUILDS.includes(kind);
     let planned;
     let clear = [];
     if (onSite) {
-      const site = findSite(kind, { world: this.world, player: this.player, aim: this.kevin.aim });
+      const site = findSite(kind, { world: this.world, player: this.player, aim });
       if (!site.ok) return refuse(site.reason);
       planned = site.blocks;
       clear = site.clear;
@@ -162,7 +196,7 @@ export class KevinBuilder {
       }
     }
 
-    return { ok: true, job: { kind, clear, nextClear: 0, blocks, next: 0, timer: 0 } };
+    return { ok: true, job: newJob(kind, clear, blocks) };
   }
 
   // ---- 3: building it ----
@@ -240,6 +274,7 @@ export class KevinBuilder {
         this.inventory.removeBlock(b.id, 1);
         this.inventory.changed();
       }
+      job.changed++;
       this.kevin.workAt(b);
       this.sparkle(b);
       return;
@@ -256,6 +291,7 @@ export class KevinBuilder {
       if (id !== c.id || !this.world.isNatural(c.x, c.y, c.z) || !isBreakableId(id)) continue;
       if (!this.world.setBlock(c.x, c.y, c.z, BLOCK.AIR)) continue; // ground not loaded
       if (!this.inventory.creative) this.inventory.add(dropId(id)); // like mining it yourself
+      job.changed++;
       this.kevin.workAt(c);
       this.sparkle(c, { out: true });
       return true;
@@ -265,13 +301,27 @@ export class KevinBuilder {
 
   // The job's over. `result`: 'done', 'stopped', 'outOfBlocks' or 'abandoned'.
   finish(result, fill = {}) {
-    const { kind } = this.job;
+    const { kind, doneLine, changed, planned } = this.job;
     const thing = THINGS[kind];
     this.job = null;
     this.kevin.stopWork();
+
+    // Never claim success for nothing: if hardly anything actually changed
+    // (things got in the way, you stood in the spot, the ground unloaded...),
+    // he says so instead of his "done" line.
+    if (result === 'done' && changed < planned * MOSTLY_DONE) {
+      this.talk.note(`Kevin tried to make a ${thing} but only managed ${changed} of ${planned} blocks`);
+      this.talk.say(changed === 0
+        ? pickLine('jobFailed', 0, { thing })
+        : pickLine('jobPartial', changed, { thing, planned }));
+      return;
+    }
+
     if (result === 'done') {
-      this.talk.note(kind === 'light' ? 'Kevin put up glow lamps for the player' : `Kevin built the player a ${thing}`);
-      this.talk.say(pickLine(kind === 'light' ? 'litUp' : 'built', 0, { thing }), { interrupt: false });
+      const dug = DIGS.includes(kind);
+      this.talk.note(kind === 'light' ? 'Kevin put up glow lamps for the player'
+        : `Kevin ${dug ? 'dug' : 'built'} the player a ${thing}`);
+      this.talk.say(pickLine(doneLine ?? (kind === 'light' ? 'litUp' : 'built'), 0, { thing }), { interrupt: false });
     } else if (result === 'outOfBlocks') {
       this.talk.note(`Kevin ran out of ${fill.block} halfway through a ${thing}`);
       this.talk.say(pickLine('outOfBlocks', 0, fill));

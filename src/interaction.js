@@ -150,13 +150,14 @@ export class Interaction {
   // line of sight is straight in the drawn picture, so we walk along it in
   // small steps and turn each step back into flat-world coordinates. That way
   // you always hit the block you can see under the crosshair.
-  raycast() {
+  // `reach` = how far to look (Kevin looks further, to see where you're pointing).
+  raycast(reach = REACH) {
     const origin = this.camera.position;
     const dir = this.camera.getWorldDirection(this.direction);
 
     let air = this.cellAt(origin, dir, 0); // the block the ray starts in
     let airT = 0;
-    for (let t = RAY_STEP; t <= REACH; t += RAY_STEP) {
+    for (let t = RAY_STEP; t <= reach; t += RAY_STEP) {
       const cell = this.cellAt(origin, dir, t);
       if (cell.x === air.x && cell.y === air.y && cell.z === air.z) continue;
       if (!this.world.isSolid(cell.x, cell.y, cell.z)) {
