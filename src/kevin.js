@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { THEME } from './theme.js';
+import { BLOCK } from './blocks.js';
 import { MobRenderer, animateMob, modelBounds } from './mobModel.js';
 import { angleTowards } from './mobBrains.js';
 import { angleDifference } from './mobs.js';
@@ -565,7 +566,9 @@ export class Kevin {
         if (!this.world.isLoadedAt(x, z)) continue;
         for (const dy of heights) {
           const y = Math.floor(p.y) + dy;
-          if (this.world.isSolid(x, y - 1, z) && !this.world.isSolid(x, y, z) && !this.world.isSolid(x, y + 1, z)) {
+          // (Not on top of the spaceship.)
+          if (this.world.isSolid(x, y - 1, z) && !this.world.isSolid(x, y, z) && !this.world.isSolid(x, y + 1, z) &&
+              this.world.getBlock(x, y - 1, z) !== BLOCK.SHIP_HULL) {
             return { x: x + 0.5, y, z: z + 0.5 };
           }
         }

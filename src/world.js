@@ -58,6 +58,7 @@ export class World {
     this.seed = seed;
     this.terrain = new Terrain(seed, WORLD_HEIGHT);
     this.editStore = editStore; // remembers the player's changes (storage.js)
+    this.shipCells = new Map(); // chunk key -> [[lx, y, lz], ...]: where the ship's invisible hull goes
     this.chunks = new Map();    // key "cx,cz" -> Chunk (only the loaded ones)
     this.group = new THREE.Group(); // add this to the scene to see the world
 
@@ -119,6 +120,19 @@ export class World {
     return isSolidId(this.getBlock(x, y, z));
   }
 
+  // Where the spaceship's invisible hull goes: a list of block cells
+  // [{ x, y, z }, ...] (see ship.js). Call before any land is loaded.
+  setShipCells(cells) {
+    this.shipCells.clear();
+    for (const { x, y, z } of cells) {
+      const cx = Math.floor(x / CHUNK_SIZE);
+      const cz = Math.floor(z / CHUNK_SIZE);
+      const key = this.chunkKey(cx, cz);
+      if (!this.shipCells.has(key)) this.shipCells.set(key, []);
+      this.shipCells.get(key).push([x - cx * CHUNK_SIZE, y, z - cz * CHUNK_SIZE]);
+    }
+  }
+
   // What fills the space when the block at (x, y, z) is dug out: water if it's
   // at or below sea level and touches water (beside it or above it), else air.
   // So digging into the sea floor makes a hole that fills with sea, but
@@ -170,6 +184,7 @@ export class World {
     const lx = x - cx * CHUNK_SIZE;
     const lz = z - cz * CHUNK_SIZE;
     if (chunk.get(lx, y, lz) === id) return false;
+    if (chunk.get(lx, y, lz) === BLOCK.SHIP_HULL) return false; // the spaceship: nothing changes it
     chunk.set(lx, y, lz, id);
     this.editStore.record(this.chunkKey(cx, cz), lx, y, lz, id, this.terrain.blockAt(x, y, z));
 
@@ -257,6 +272,8 @@ export class World {
         chunk.set(lx, y, lz, id);
       }
     }
+    // The spaceship's invisible hull, last, so nothing can end up inside it.
+    for (const [lx, y, lz] of this.shipCells.get(key) ?? []) chunk.set(lx, y, lz, BLOCK.SHIP_HULL);
     this.chunks.set(key, chunk);
     return chunk;
   }

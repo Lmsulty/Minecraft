@@ -416,6 +416,27 @@ export const THEME = {
     },
   },
 
+  // ---- The spaceship (shape in ship.js) ----
+  // A chunky old cargo hauler that's seen a lot of travel: cream hull with
+  // rust, a mismatched replacement panel, scorch marks behind the engines.
+  // Parts marked "glows" in ship.js (window, engines, lights) shine at night.
+  ship: {
+    hull: '#cfc6ae',       // cream hull panels
+    hullDark: '#7a7466',   // belly, engine pods
+    metal: '#4c4f55',      // nozzles, antenna, ramp
+    legs: '#5a5d63',       // landing legs
+    feet: '#33353a',       // landing pads
+    patch: '#7f9a86',      // a replacement panel that doesn't match
+    rust: '#9a4a22',       // rust patches
+    stripe: '#c0582a',     // faded stripe down the sides
+    scorch: '#2c2824',     // burnt metal behind the engines
+    door: '#2e3136',
+    window: '#7ff5e8',     // glowing cockpit window (glows)
+    engine: '#ffa040',     // glowing engine nozzles (glows)
+    light: '#ffe9a0',      // lights by the door (glow)
+    beacon: '#ff4a3a',     // blinking light on the tail fin (glows)
+  },
+
   // ---- Item pictures (see itemIcons.js for the patterns) ----
   // Lists like base: [...] are picked from at random, pixel by pixel.
   items: {

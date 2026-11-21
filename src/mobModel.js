@@ -37,10 +37,11 @@ function makeSpeckleTexture() {
   return texture;
 }
 
-const CUBE = new THREE.BoxGeometry(1, 1, 1);
+// Also used by the spaceship (ship.js), so it looks like it belongs with the creatures.
+export const CUBE = new THREE.BoxGeometry(1, 1, 1);
 const SPECKLE = makeSpeckleTexture();
-const MATERIAL = bendMaterial(new THREE.MeshLambertMaterial({ map: SPECKLE }));    // lit by the sun, moon and lights
-const GLOW_MATERIAL = bendMaterial(new THREE.MeshBasicMaterial({ map: SPECKLE })); // always fully bright
+export const MATERIAL = bendMaterial(new THREE.MeshLambertMaterial({ map: SPECKLE }));    // lit by the sun, moon and lights
+export const GLOW_MATERIAL = bendMaterial(new THREE.MeshBasicMaterial({ map: SPECKLE })); // always fully bright
 const FLASH = new THREE.Color(THEME.mobs.hitFlash);
 
 // Scratch space, reused every frame (making new objects every frame would

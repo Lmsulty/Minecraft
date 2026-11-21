@@ -451,6 +451,7 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
         const id = blocks[i];
         if (id === 0) continue; // air
         const uvs = FACE_UVS[id];
+        if (!uvs) continue; // never drawn (e.g. the spaceship's invisible hull)
         const list = lists[BLOCK_TYPES[id].renderType];
 
         for (let f = 0; f < FACES.length; f++) {

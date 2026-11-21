@@ -12,6 +12,7 @@ import { CreativeToggle } from './creative.js';
 import { InventoryScreen } from './inventoryScreen.js';
 import { applyUiTheme, THEME, PLANET } from './theme.js';
 import { setupDebugPlanetKey } from './planets.js';
+import { Ship, chooseShipSite } from './ship.js';
 import { DayNight } from './dayNight.js';
 import { Underwater } from './underwater.js';
 import { updateCurve, cullBentChunks } from './curve.js';
@@ -83,12 +84,20 @@ const dayNight = new DayNight(scene, camera, ambientLight, mainLight, graphics.l
 // Sea-coloured view with your head under water (underwater.js).
 const underwater = new Underwater(scene, camera, world, ambientLight, () => graphics.level.haze);
 
-// Spawn near the middle of chunk (0, 0), or on the nearest island if that's
-// sea. Build the ground around it right away so there's something to stand
-// on; the rest streams in over the next second.
+// ---- The spaceship, parked near where you start (ship.js) ----
+// Near the middle of chunk (0, 0), or on the nearest island if that's sea.
+// Its spot is chosen before any land loads, so its invisible hull is in
+// place from the start.
 const land = world.terrain.findLand(SPAWN.x, SPAWN.z);
-world.loadAroundNow(land.x + 0.5, land.z + 0.5);
-const spawn = findSpawn(land.x, land.z);
+const shipSite = chooseShipSite(world.terrain, editStore, land);
+world.setShipCells(shipSite.cells);
+const ship = new Ship(scene, shipSite);
+
+// You (and Kevin) start beside the ship's ramp. Build the ground around it
+// right away so there's something to stand on; the rest streams in over the
+// next second.
+world.loadAroundNow(shipSite.door.x + 0.5, shipSite.door.z + 0.5);
+const spawn = findSpawn(shipSite.door.x, shipSite.door.z);
 player.spawn(spawn.x, spawn.y, spawn.z);
 // Start looking at the starter sinkhole, so a new player sees a cave straight
 // away. (Planets with no caves don't have one.)
@@ -208,6 +217,7 @@ function loop(now) {
   player.update(dt);
   mobs.update(dt);     // after the player moves, so they react to where you are now
   kevin.update(dt);    // same for Kevin
+  ship.update(dt);     // blinks the light on its tail fin
   kevinBuilder.update(dt); // places his next block, if he's building something
   kevinOrders.update(dt);  // starts his next job, or waits for you to pick a spot
   kevinTalk.update(dt); // after Kevin moves, so his speech bubble follows him

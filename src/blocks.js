@@ -22,6 +22,8 @@ export const BLOCK = {
   // Made by the world on the lava planet:
   BLACK_GLASS: 14,
   EMBER_CRACK: 15,
+  // Invisible, fills the spaceship's shape (ship.js). Never saved.
+  SHIP_HULL: 16,
 };
 
 // Indexed by block id.
@@ -116,6 +118,15 @@ export const BLOCK_TYPES = [
     id: BLOCK.EMBER_CRACK, name: 'ember crack', solid: true, opaque: true, renderType: 'glow', blocksLight: true,
     emitsLight: true,
     textures: { top: 'ember_crack', side: 'ember_crack', bottom: 'ember_crack' },
+  },
+  {
+    // The spaceship's invisible shape: solid, so you, Kevin and creatures bump
+    // into the ship, and nothing can be built or dug there. It's never drawn,
+    // and it doesn't change how anything around it looks: not opaque (blocks
+    // touching it keep all their faces and get no soft shadows from it) and
+    // it doesn't block sunlight. No textures = can't be carried or placed.
+    id: BLOCK.SHIP_HULL, name: 'ship hull', solid: true, opaque: false, blocksLight: false,
+    breakable: false,
   },
 ];
 

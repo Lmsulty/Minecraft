@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { isBreakableId, isEmptyId, dropId } from './blocks.js';
+import { BLOCK, isBreakableId, isEmptyId, dropId } from './blocks.js';
 import { isPlaceableId, displayName } from './items.js';
 import { THEME } from './theme.js';
 import { bendMaterial, unbendPoint } from './curve.js';
@@ -119,7 +119,8 @@ export class Interaction {
   // Also tells Kevin which block you're aiming at, so he can get out of the way.
   update() {
     const hit = this.player.locked ? this.raycast() : null;
-    this.outline.visible = !!hit;
+    // No outline on the spaceship's invisible hull: you'd see a block-shaped box on the ship.
+    this.outline.visible = !!hit && this.world.getBlock(hit.x, hit.y, hit.z) !== BLOCK.SHIP_HULL;
     if (hit) this.outline.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
 
     if (this.kevin) {
