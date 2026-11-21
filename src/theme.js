@@ -84,7 +84,20 @@ export const THEME = {
             speckLight: '#ffffff',
           },
         },
-        blackHole: { size: 8, brightness: 1.6, glowAmount: 0.15 }, // the closest planet: it fills a big part of the sky
+        // The closest planet: the black hole fills a big part of the sky.
+        // Here it looks like a huge hole: a big black centre (about 85% of
+        // its width) with only a thin fiery ring hugging the edge.
+        blackHole: {
+          size: 14,              // black centre: 34 degrees across...
+          swirlSize: 1.25,       // ...and the fiery ring ends just outside it (40 degrees across in all)
+          swirlFadeStart: 0.9,   // the ring stays bright right up to its thin outer edge
+          edgeSoftness: 0.05,    // a sharp edge to the hole
+          gasFadeIn: [1.02, 1.05], // the ring starts right at the edge: no gap, no gas over the black
+          viewAngle: 80,         // seen almost face-on, so the ring shows all the way round
+          brightness: 1.8,       // the thin ring blazes a little brighter
+          glowAmount: 0.03,      // hardly any glow spreading into the sky
+          bendStrength: 1.7,     // the faint ring of bent starlight sits just outside the fiery ring
+        },
 
         ui: { '--page-bg': '#bfe8e4' },
       },
@@ -253,6 +266,12 @@ export const THEME = {
                                // (90 = straight down on it, 0 = edge-on)
     tilt: 15,                  // degrees the whirlpool is turned on the sky
     swirlSize: 2.5,            // outer edge of the whirlpool, in hole radii
+    swirlFadeStart: 0.6,       // the whirlpool fades out from this share of swirlSize to its edge
+                               // (bigger = it stays bright further out, then stops sooner)
+    edgeSoftness: 0.35,        // how blurry the hole's edge is, in hole radii (small = sharp edge)
+    gasFadeIn: [0.82, 1.15],   // the gas fades in between these distances (in hole radii).
+                               // Starting below 1 = on the near side it spills over the
+                               // hole's edge, covering part of the black.
     armCount: 3,               // number of spiral arms
     armTwist: 1.6,             // how tightly the arms wind (bigger = more coiled)
     turbulence: 0.9,           // how ragged and churning the arms are (0 = smooth)

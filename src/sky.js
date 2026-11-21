@@ -250,8 +250,8 @@ function skyFragmentShader(detail) {
         // Denser and brighter towards the middle; it pours over the edge of
         // the hole and vanishes, and thins out at the outside.
         float profile = pow(1.3 / rho, 0.9)
-                      * smoothstep(0.82, 1.15, rho)
-                      * (1.0 - smoothstep(${f(SWIRL * 0.6)}, ${f(SWIRL)}, rho));
+                      * smoothstep(${f(BH.gasFadeIn[0])}, ${f(BH.gasFadeIn[1])}, rho)
+                      * (1.0 - smoothstep(${f(SWIRL * BH.swirlFadeStart)}, ${f(SWIRL)}, rho));
         return gas * profile;
       }
 
@@ -400,7 +400,7 @@ function skyFragmentShader(detail) {
           if (depth > 0.0) color = addGas(color, rho, gas, power);
 
           // ...then the hole itself, with a soft edge...
-          float hole = 1.0 - smoothstep(0.7, 1.05, r);
+          float hole = 1.0 - smoothstep(${f(1.05 - BH.edgeSoftness)}, 1.05, r);
           color = mix(color, holeShadow, hole);
 
           // ...and the near half pours over its edge, eating into the
