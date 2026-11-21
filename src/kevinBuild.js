@@ -3,7 +3,8 @@ import { BLOCK, isBreakableId, dropId } from './blocks.js';
 import { isPlaceableId, displayName } from './items.js';
 import { THEME } from './theme.js';
 import { bendMaterial } from './curve.js';
-import { blueprint, MAIN } from './kevinBlueprints.js';
+import { blueprint, structure, MAIN } from './kevinBlueprints.js';
+import { NEXT_NAMES } from './kevinActions.js';
 import { findSite } from './kevinSite.js';
 import { digPlan } from './kevinDig.js';
 import { pickLine } from './kevinBrain.js';
@@ -46,6 +47,7 @@ const BEAM_TIME = 0.12;     // seconds the beam from his antenna lasts
 const POP_COUNT = 6;        // sparkles that can show at once
 const AIM_REACH = 8;        // how far away he looks for the block you're pointing at
 const MOSTLY_DONE = 0.5;    // changed fewer than this share of the planned blocks: he admits it didn't work
+const LAMPS_ESTIMATE = 4;   // lamps a "light this up" will need, if he can't tell yet
 // ==========================================================
 
 // Names for his lines ("One {thing}, coming up").
@@ -81,7 +83,8 @@ export class KevinBuilder {
     this.player = player;
     this.inventory = inventory;
     this.talk = talk;
-    this.job = null; // what he's building: { kind, blocks, next, timer }
+    this.job = null; // what he's building (see newJob)
+    this.onJobEnd = null; // ({ kind, result, line, success }) when a job ends (set by kevinOrders.js)
 
     // The sparkles: a bright outline round each new block that shrinks onto it.
     const color = THEME.mobs.kevin.buildSparkle;
@@ -300,36 +303,82 @@ export class KevinBuilder {
   }
 
   // The job's over. `result`: 'done', 'stopped', 'outOfBlocks' or 'abandoned'.
+  // Works out what he should say, then hands it to onJobEnd (kevinOrders.js,
+  // which may say something else if there are more jobs to do), or just says it.
   finish(result, fill = {}) {
     const { kind, doneLine, changed, planned } = this.job;
     const thing = THINGS[kind];
     this.job = null;
     this.kevin.stopWork();
 
-    // Never claim success for nothing: if hardly anything actually changed
-    // (things got in the way, you stood in the spot, the ground unloaded...),
-    // he says so instead of his "done" line.
+    let line = null;      // what he says (null = nothing: you told him to stop)
+    let success = false;  // did it actually work?
     if (result === 'done' && changed < planned * MOSTLY_DONE) {
+      // Never claim success for nothing: if hardly anything actually changed
+      // (things got in the way, you stood in the spot, the ground unloaded...),
+      // he says so instead of his "done" line.
       this.talk.note(`Kevin tried to make a ${thing} but only managed ${changed} of ${planned} blocks`);
-      this.talk.say(changed === 0
+      line = changed === 0
         ? pickLine('jobFailed', 0, { thing })
-        : pickLine('jobPartial', changed, { thing, planned }));
-      return;
-    }
-
-    if (result === 'done') {
+        : pickLine('jobPartial', changed, { thing, planned });
+    } else if (result === 'done') {
       const dug = DIGS.includes(kind);
       this.talk.note(kind === 'light' ? 'Kevin put up glow lamps for the player'
         : `Kevin ${dug ? 'dug' : 'built'} the player a ${thing}`);
-      this.talk.say(pickLine(doneLine ?? (kind === 'light' ? 'litUp' : 'built'), 0, { thing }), { interrupt: false });
+      line = pickLine(doneLine ?? (kind === 'light' ? 'litUp' : 'built'), 0, { thing });
+      success = true;
     } else if (result === 'outOfBlocks') {
       this.talk.note(`Kevin ran out of ${fill.block} halfway through a ${thing}`);
-      this.talk.say(pickLine('outOfBlocks', 0, fill));
+      line = pickLine('outOfBlocks', 0, fill);
     } else if (result === 'abandoned') {
       this.talk.note(`the player walked off while Kevin was building a ${thing}`);
-      this.talk.say(pickLine('abandoned', 0, { thing }));
+      line = pickLine('abandoned', 0, { thing });
     }
-    // 'stopped': you told him to, and his chat reply already said so.
+
+    if (this.onJobEnd) this.onJobEnd({ kind, result, line, success });
+    else if (line) this.talk.say(line, { interrupt: !success });
+  }
+
+  // ---- Survival: can you afford several jobs at once? ----
+
+  // Roughly how many of each block a job will use, as a Map id -> count.
+  // (Floors are included; foundations depend on the ground, so each job
+  // still checks exactly when it starts.) `main` = the block he builds with.
+  estimateNeeds(kind, main) {
+    const needs = new Map();
+    const add = (id, n) => { if (n > 0) needs.set(id, (needs.get(id) ?? 0) + n); };
+    if (SITE_BUILDS.includes(kind)) {
+      // The tower's lamp is optional (a plain block if you have no lamps), so it isn't counted.
+      const blocks = structure(kind, { x: 0, y: 0, z: 0 }, { fx: 0, fz: -1, rx: 1, rz: 0 });
+      add(main, blocks.filter((b) => b.id === MAIN).length);
+    } else if (kind === 'bridge') {
+      add(main, blueprint(kind, { world: this.world, player: this.player }).length);
+    } else if (kind === 'light') {
+      add(BLOCK.GLOW_LAMP, blueprint(kind, { world: this.world, player: this.player }).length || LAMPS_ESTIMATE);
+    }
+    // Tunnels and stairs need nothing (their lamps are optional).
+    return needs;
+  }
+
+  // Can you afford ALL these jobs together? Returns null if so (or in
+  // creative), or what he says if not, naming the job that tips it over.
+  checkAfford(kinds) {
+    const inv = this.inventory;
+    if (inv.creative) return null;
+    const main = this.chooseBlock();
+    const total = new Map();
+    for (const kind of kinds) {
+      for (const [id, n] of this.estimateNeeds(kind, main)) {
+        if (id === null) return pickLine('noBlocks');
+        const sum = (total.get(id) ?? 0) + n;
+        total.set(id, sum);
+        const have = inv.countOf(id);
+        if (sum > have) {
+          return pickLine('cantAffordList', sum, { thing: NEXT_NAMES[kind], block: blockName(id), have });
+        }
+      }
+    }
+    return null;
   }
 
   // ---- The sparkle and the beam ----

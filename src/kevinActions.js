@@ -5,7 +5,7 @@
 //   online brain  the server (supabase/functions/kevin) asks Claude, which
 //                 adds a tag like [do:stay] to the reply. The server only
 //                 passes on names from its own list.
-//   offline brain kevinBrain.js spots simple keywords (findAction below).
+//   offline brain kevinBrain.js spots simple keywords (findActions below).
 // Either way, the game double-checks the name here (isAction) before
 // running it, so a strange or made-up action is simply ignored.
 //
@@ -20,12 +20,15 @@
 //   light   put glow lamps on the ground around you
 //   tunnel  dig a tunnel straight ahead (kevinDig.js)
 //   stairs  dig a staircase going down (kevinDig.js)
+//
+// You can ask for up to 3 in one message ("build a hut, then light it up").
+// kevinOrders.js keeps the list and does them one after another.
 
 export const ACTIONS = ['stay', 'follow', 'stop', 'wall', 'tower', 'hut', 'bridge', 'light', 'tunnel', 'stairs'];
 
 // Keywords for the offline brain. Checked in order; first match wins.
 // 'stay' goes first so "stop following me" and "don't follow me" mean stay,
-// and 'follow' goes last so "come here and build a wall" means the wall.
+// and 'follow' goes last so "come here to build a wall" means the wall.
 const ACTION_WORDS = [
   { action: 'stay', words: /\b(stay|wait (here|there|for me)|stop following|don'?t follow|stand still|hold (it|on)|guard (this|here))\b/ },
   { action: 'stop', words: /\b(stop|cancel|never ?mind|halt|that'?s enough)\b/ },
@@ -50,31 +53,46 @@ export function findAction(message) {
   return ACTION_WORDS.find(({ words }) => words.test(text))?.action ?? null;
 }
 
-// Make Kevin do it. `builder` is his KevinBuilder (kevinBuild.js).
-// Returns { note, line }, both optional:
-//   note  a short note for his memory of recent events (kevinTalk.js)
-//   line  something he should say INSTEAD of his chat reply, because the
-//         game found it can't be done (e.g. "That needs 71 planks...")
-export function runAction(action, { kevin, builder }) {
-  if (!isAction(action)) return {};
-  if (action === 'stay') {
-    kevin.stay();
-    return { note: 'the player told Kevin to stay put' };
+// Every action a message asks for, in order (offline brain). The message is
+// split on "and", "then", "also", commas and semicolons, and each part can
+// ask for one action: "build a hut, then light it up and make a bridge"
+// -> ['hut', 'light', 'bridge']. The same action twice in a row counts once.
+export function findActions(message) {
+  const parts = message.toLowerCase().split(/,|;|\band then\b|\bthen\b|\band\b|\balso\b/);
+  const found = [];
+  for (const part of parts) {
+    const action = findAction(part);
+    if (action && found[found.length - 1] !== action) found.push(action);
   }
-  if (action === 'follow') {
-    kevin.follow();
-    return { note: 'the player told Kevin to follow them again' };
-  }
-  if (action === 'stop') {
-    return builder.stop() ? { note: 'the player told Kevin to stop building' } : {};
-  }
+  return found;
+}
 
-  // A build. Check it can be done before starting.
-  const plan = builder.plan(action);
-  if (!plan.ok) return { line: plan.line, note: `Kevin couldn't do the ${action} the player asked for` };
-  builder.start(plan.job);
-  if (action === 'light') return { note: 'the player asked Kevin to put up lamps' };
-  if (action === 'tunnel') return { note: 'the player asked Kevin to dig a tunnel' };
-  if (action === 'stairs') return { note: 'the player asked Kevin to dig a staircase down' };
-  return { note: `the player asked Kevin to build a ${action}` };
+// ---- Names for his lines (kevinBrain.js and kevinOrders.js) ----
+
+// In a list: "Right: a hut, then some lamps."
+export const LIST_NAMES = {
+  stay: 'stay put', follow: 'follow you', stop: 'stop',
+  wall: 'a wall', tower: 'a tower', hut: 'a hut', bridge: 'a bridge',
+  light: 'some lamps', tunnel: 'a tunnel', stairs: 'stairs down',
+};
+// When it's next: "Now the bridge."
+export const NEXT_NAMES = {
+  stay: 'staying put', follow: 'following you', stop: 'stopping',
+  wall: 'the wall', tower: 'the tower', hut: 'the hut', bridge: 'the bridge',
+  light: 'the lamps', tunnel: 'the tunnel', stairs: 'the stairs',
+};
+// When it's finished: "Hut done."
+export const DONE_NAMES = {
+  wall: 'Wall', tower: 'Tower', hut: 'Hut', bridge: 'Bridge',
+  light: 'Lamps', tunnel: 'Tunnel', stairs: 'Staircase',
+};
+
+// The jobs he'll actually do from a list of actions: "stop" wipes out
+// everything before it, and only the first `max` after that count.
+// Returns { stop, jobs, tooMany }.
+export function sortOrders(actions, max) {
+  const valid = actions.filter(isAction);
+  const lastStop = valid.lastIndexOf('stop');
+  const after = valid.slice(lastStop + 1);
+  return { stop: lastStop >= 0, jobs: after.slice(0, max), tooMany: after.length > max };
 }

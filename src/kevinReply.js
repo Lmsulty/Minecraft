@@ -6,10 +6,10 @@ import { getKevinName } from './kevinName.js';
 //  askKevin(): THE ONE PLACE KEVIN'S CHAT REPLIES COME FROM.
 //
 //  It asks Kevin's online brain (the Supabase Edge Function "kevin", which
-//  calls Claude) and returns a promise of { text, mood, action }:
+//  calls Claude) and returns a promise of { text, mood, actions }:
 //    text    what he says
 //    mood    'talking', or 'annoyed' (his face while he says it)
-//    action  something to DO, e.g. 'stay' (see kevinActions.js), or null
+//    actions things to DO, in order, e.g. ['hut', 'light'] (see kevinActions.js), or []
 //
 //  If the server can't be used, it falls back to the offline brain
 //  (kevinBrain.js), so the game never breaks:
@@ -25,6 +25,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const TIMEOUT_MS = 8000;
 const MAX_MESSAGE_LENGTH = 300;  // same limit as the server
+const MAX_ACTIONS = 6;           // the to-do list does at most 3, but needs to know if you asked for more
 const HISTORY_LENGTH = 6;        // how many recent chat messages to send along
 const OFFLINE_THINKING = [0.5, 1]; // seconds the offline brain "thinks" (so his thinking face shows)
 
@@ -45,7 +46,7 @@ export function isOnlineBrainConfigured() {
   return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 }
 
-// The online brain. Returns { text, mood, action }, or null if it didn't work.
+// The online brain. Returns { text, mood, actions }, or null if it didn't work.
 async function askServer(message, context) {
   if (!isOnlineBrainConfigured()) return null;
   const controller = new AbortController();
@@ -70,7 +71,8 @@ async function askServer(message, context) {
     return {
       text: data.text.trim().slice(0, MAX_MESSAGE_LENGTH),
       mood: data.mood === 'annoyed' ? 'annoyed' : 'talking',
-      action: isAction(data.action) ? data.action : null, // only actions the game knows
+      // Only actions the game knows. (Older servers send just one `action`.)
+      actions: (Array.isArray(data.actions) ? data.actions : [data.action]).filter(isAction).slice(0, MAX_ACTIONS),
     };
   } catch (err) {
     console.warn('Kevin\'s online brain is unreachable; using the offline brain.', err.name === 'AbortError' ? '(timed out)' : err);

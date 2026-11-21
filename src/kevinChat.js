@@ -1,5 +1,4 @@
 import { askKevin, isOnlineBrainConfigured, correctLastReply } from './kevinReply.js';
-import { runAction } from './kevinActions.js';
 import { getKevinName } from './kevinName.js';
 import { displayName } from './items.js';
 
@@ -16,7 +15,8 @@ import { displayName } from './items.js';
 // bubble, caption if he's out of sight, and voice), through kevinTalk.js.
 //
 // The reply itself comes from askKevin() in kevinReply.js. If it comes with
-// an action ("stay here", "build a hut"), kevinActions.js makes him do it.
+// actions ("stay here", "build a hut, then light it up"), his to-do list
+// (kevinOrders.js) makes him do them.
 // If the game finds it can't be done (not enough blocks, say), he says why
 // instead of his reply, so he never promises something and then doesn't do it.
 
@@ -24,11 +24,11 @@ const MAX_MESSAGE_LENGTH = 300;
 const LOG_LENGTH = 6; // messages shown in the box
 
 export class KevinChat {
-  constructor(element, { player, kevin, builder, talk, hotbar, inventory, mobs, dayNight }) {
+  constructor(element, { player, kevin, orders, talk, hotbar, inventory, mobs, dayNight }) {
     this.element = element;
     this.player = player;
     this.kevin = kevin;
-    this.builder = builder; // KevinBuilder (kevinBuild.js)
+    this.orders = orders; // his to-do list (kevinOrders.js)
     this.talk = talk;
     this.hotbar = hotbar;
     this.inventory = inventory;
@@ -96,14 +96,15 @@ export class KevinChat {
       .then((answer) => {
         this.waiting = false;
         this.kevin.mood = 'idle';
-        // An order ("stay here", "build a hut")? Do it, and remember it for later chats.
-        const { note, line } = runAction(answer.action, { kevin: this.kevin, builder: this.builder });
+        // Orders ("stay here", "build a hut, then light it up")? Hand them to
+        // his to-do list (kevinOrders.js), and remember them for later chats.
+        const { note, line, prefix } = this.orders.run(answer.actions ?? []);
         if (note) this.talk.note(note);
         // Can't be done? He says why instead.
-        if (line) {
-          answer = line;
-          correctLastReply(line.text);
-        }
+        if (line) answer = line;
+        // Too many? "Three at a time, please." goes first.
+        if (prefix) answer = { ...answer, text: `${prefix.text} ${answer.text}` };
+        if (line || prefix) correctLastReply(answer.text);
         this.addToLog(getKevinName(), answer.text);
         this.talk.say(answer); // bubble, caption and voice, like his other lines
       });
@@ -151,10 +152,10 @@ export class KevinChat {
       nearbyCreatures: creatures || 'none',
       recentEvents: this.talk.recentEventsText() || 'nothing much',
       mode: this.inventory.creative ? 'creative (unlimited blocks)' : 'survival',
-      kevinState: this.builder.describe() ??
+      kevinState: this.orders.describe() ??
         (this.kevin.staying ? 'staying put where the player told you to' : 'following the player'),
       kevinStaying: this.kevin.staying, // for the offline brain
-      kevinBusy: this.builder.busy,     // for the offline brain
+      kevinBusy: this.orders.busy,      // for the offline brain
     };
   }
 }

@@ -1,5 +1,5 @@
 import { getKevinName } from './kevinName.js';
-import { findAction } from './kevinActions.js';
+import { findActions, sortOrders, LIST_NAMES } from './kevinActions.js';
 
 // Kevin's OFFLINE BRAIN: canned lines, picked to suit the moment.
 //
@@ -227,6 +227,37 @@ const LINES = {
     'Done. I stopped where your blocks start. I don\'t touch those.',
     'I hit something of yours, so the {thing} ends there.',
   ],
+  // ---- To-do lists (kevinOrders.js) ----
+
+  // You asked for several things ({list} = "a hut, then some lamps").
+  queue: [
+    'Right: {list}. Busy day.',
+    'So that\'s {list}. In that order. Noted.',
+    'Very well: {list}. Do keep pointing.',
+  ],
+  // You asked for more than three.
+  tooMany: [
+    'Three at a time, please. I\'m a robot, not a factory.',
+    'I\'ll do the first three. I\'m a robot, not a factory.',
+  ],
+  // A job in the list is done; on to the next ({done} = "Hut", {next} = "the bridge").
+  nextJob: [
+    '{done} done. Now {next}.',
+    '{done} finished. On to {next}.',
+    '{done}, sorted. Next, {next}.',
+  ],
+  // Tacked onto a "that didn't work" line when there's more to do.
+  movingOn: [
+    'On to {next}.',
+    'Moving on to {next}.',
+  ],
+  // Survival: you can't afford the whole list. {thing} = the job that tips it
+  // over ("the bridge"), {count} {block} needed by then, {have} what you've got.
+  cantAffordList: [
+    'Can\'t do all that, I\'m afraid. By {thing} we\'d need {count} {block}, and you\'ve got {have}.',
+    'You can\'t afford {thing} on top of the rest: {count} {block} needed, {have} in your pockets.',
+  ],
+
   // Asked for a tunnel, but you're not pointing at a hillside or wall.
   pointAtHill: [
     'Point me at a hill, would you? I can\'t tunnel through air.',
@@ -368,26 +399,41 @@ export function pickLine(kind, count = 0, fill = {}) {
   };
 }
 
-// The offline answer to something you typed. Returns { text, mood, action }
-// (action = one of kevinActions.js's names, or null).
+// The offline answer to something you typed. Returns { text, mood, actions }
+// (actions = kevinActions.js names, in order; [] if none).
 // `staying` = is he staying put right now (so he can say "I already am").
 // (The chat goes through askKevin() in kevinReply.js, which uses this when
 // the server isn't available.)
 export function offlineReply(message, { staying = false, busy = false } = {}) {
   const text = message.toLowerCase();
 
-  // An order? (Checked first: "stop following me, you idiot" is still an order.)
-  const action = findAction(text);
-  if (action === 'stay') return { ...pickLine(staying ? 'alreadyStaying' : 'stay'), action };
-  if (action === 'follow') return { ...pickLine(staying ? 'follow' : 'alreadyFollowing'), action };
-  if (action === 'stop') return { ...pickLine(busy ? 'stop' : 'nothingToStop'), action };
-  if (action === 'light') return { ...pickLine('lightUp'), action };
-  if (action === 'tunnel') return { ...pickLine('dig', 0, { thing: 'tunnel' }), action };
-  if (action === 'stairs') return { ...pickLine('dig', 0, { thing: 'staircase' }), action };
-  if (action) return { ...pickLine('build', 0, { thing: action }), action }; // wall, tower, hut, bridge
+  // Orders? (Checked first: "stop following me, you idiot" is still an order.)
+  // There can be several: "build a hut, then light it up".
+  const actions = findActions(text);
+  if (actions.length > 0) {
+    // The ones he'll actually do: nothing before a "stop", at most 3 after it.
+    const { jobs } = sortOrders(actions, 3);
+    if (jobs.length > 1) {
+      const list = jobs.map((a) => LIST_NAMES[a]).join(', then ');
+      return { ...pickLine('queue', 0, { list }), actions };
+    }
+    const action = jobs[0] ?? 'stop';
+    return { ...replyToOrder(action, { staying, busy }), actions };
+  }
 
   // Saying his name on its own counts as a hello.
-  if (text.trim() === getKevinName().toLowerCase()) return { ...pickLine('greeting'), action: null };
+  if (text.trim() === getKevinName().toLowerCase()) return { ...pickLine('greeting'), actions: [] };
   const match = TOPICS.find(({ words }) => words.test(text));
-  return { ...pickLine(match ? match.topic : 'unknown'), action: null };
+  return { ...pickLine(match ? match.topic : 'unknown'), actions: [] };
+}
+
+// What he says to a single order.
+function replyToOrder(action, { staying, busy }) {
+  if (action === 'stay') return pickLine(staying ? 'alreadyStaying' : 'stay');
+  if (action === 'follow') return pickLine(staying ? 'follow' : 'alreadyFollowing');
+  if (action === 'stop') return pickLine(busy ? 'stop' : 'nothingToStop');
+  if (action === 'light') return pickLine('lightUp');
+  if (action === 'tunnel') return pickLine('dig', 0, { thing: 'tunnel' });
+  if (action === 'stairs') return pickLine('dig', 0, { thing: 'staircase' });
+  return pickLine('build', 0, { thing: action }); // wall, tower, hut, bridge
 }

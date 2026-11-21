@@ -23,6 +23,7 @@ import { KevinCaption } from './kevinCaption.js';
 import { KevinTalk } from './kevinTalk.js';
 import { KevinChat } from './kevinChat.js';
 import { KevinBuilder } from './kevinBuild.js';
+import { KevinOrders } from './kevinOrders.js';
 
 // Interface colours (CSS variables) from theme.js, before anything is shown.
 applyUiTheme();
@@ -133,9 +134,12 @@ const kevinBuilder = new KevinBuilder({
   aim: (reach) => interaction.raycast(reach), // where you're pointing (he looks further than you can reach)
 });
 
+// ---- Kevin's to-do list: up to 3 jobs from one message (kevinOrders.js) ----
+const kevinOrders = new KevinOrders({ kevin, builder: kevinBuilder, talk: kevinTalk });
+
 // ---- Chatting with Kevin: press Enter (kevinChat.js; replies from askKevin() in kevinReply.js) ----
 new KevinChat(document.getElementById('kevin-chat'), {
-  player, kevin, builder: kevinBuilder, talk: kevinTalk, hotbar, inventory, mobs, dayNight,
+  player, kevin, orders: kevinOrders, talk: kevinTalk, hotbar, inventory, mobs, dayNight,
 });
 
 // ---- Creative mode: press C for unlimited blocks ----
@@ -186,6 +190,7 @@ function loop(now) {
   mobs.update(dt);     // after the player moves, so they react to where you are now
   kevin.update(dt);    // same for Kevin
   kevinBuilder.update(dt); // places his next block, if he's building something
+  kevinOrders.update();    // starts his next job, if he has a list
   kevinTalk.update(dt); // after Kevin moves, so his speech bubble follows him
   interaction.update();
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera

@@ -2,12 +2,14 @@
 //
 // The game sends what the player typed, plus a little game context and the
 // last few chat messages. This function asks Claude (claude-haiku-5-5) for
-// Kevin's reply and sends back { text, mood, action }.
+// Kevin's reply and sends back { text, mood, actions, action }.
 //
-// action: if the player asked Kevin to DO something he can do ("stay here",
-// "build a hut"), Claude adds a tag like [do:hut] and this sends back "hut". Only names in
-// ACTIONS are ever sent; otherwise action is null. (The game checks again,
-// see src/kevinActions.js.)
+// actions: if the player asked Kevin to DO things he can do ("build a hut,
+// then light it up"), Claude adds a tag for each, in order, like
+// [do:hut][do:light], and this sends back ["hut", "light"]. Only names in
+// ACTIONS are ever sent. `action` is just the first one (or null), for older
+// versions of the game. (The game checks again and does at most 3, see
+// src/kevinActions.js and src/kevinOrders.js.)
 //
 // The Anthropic API key lives ONLY here, as the Edge Function secret
 // ANTHROPIC_API_KEY. It is never sent to the browser.
@@ -19,13 +21,14 @@ import Anthropic from "npm:@anthropic-ai/sdk@1.12.0";
 
 // ---- Safety limits ----
 const MODEL = "claude-haiku-5-5";
-const MAX_TOKENS = 90;           // replies are one or two short sentences (plus the tags)
+const MAX_TOKENS = 110;          // replies are one or two short sentences (plus the tags)
 const MAX_REPLY_WORDS = 40;      // a longer reply is trimmed (at a sentence end if possible)
 const MAX_MESSAGE_LENGTH = 300;  // longer messages are rejected
 const MAX_HISTORY = 6;           // only the last few chat messages are sent
 const MAX_NAME_LENGTH = 16;
 const MAX_CONTEXT_TEXT = 80;     // each piece of game context is cut to this length
 const RATE_LIMIT = 12;           // messages per minute from one address (best effort)
+const MAX_ACTIONS = 6;           // tags passed on (the game does 3, and says so if there were more)
 
 // Things Kevin can actually do (keep in step with src/kevinActions.js).
 const ACTIONS = ["stay", "follow", "stop", "wall", "tower", "hut", "bridge", "light", "tunnel", "stairs"];
@@ -109,7 +112,8 @@ Things you can actually do. When the player clearly asks for one, put its action
 - [do:light] put glow lamps on the ground around the player (e.g. "light this up", "it's too dark")
 - [do:tunnel] dig a tunnel, 2 high and 10 long, into the hillside or wall the player is pointing at (e.g. "dig a tunnel", "dig through this hill")
 - [do:stairs] dig a staircase going down, 8 steps, starting at the ground the player is aiming at (e.g. "dig down", "make some stairs down", "let's go underground")
-Use at most one action tag, and only when the player asks for that. If you're already doing it, you can say so, but still add the tag.
+Only add action tags for things the player asks for. If you're already doing it, you can say so, but still add the tag.
+The player can ask for up to three things in one message: add one tag for each, in the order they asked, right after the mood tag (e.g. "[talking][do:hut][do:light][do:bridge] A hut, lamps and a bridge. On it."). If they ask for more than three, still tag them all in order; the game does the first three and tells them. [do:stop] cancels everything you were going to do.
 IMPORTANT: the game does the work AFTER your reply, and the game tells the player when it's finished (or if it can't be done). So with an action tag, only say you're starting, e.g. "On it.", "Right away.", "Leave it to me." Never say it's done, built, dug, finished or ready, and don't describe how it turned out.
 For builds, the game picks the spot (where the player is looking) and the blocks, and checks the player has enough, so just agree briefly in character. For walls, towers and huts you clear natural things out of the way first (trees, dirt, stone) and level the ground; huts get a floor. When digging you only dig natural ground and stop at anything the player built; you set glow lamps into the walls if the player has some (always in creative). Don't ask for sizes or materials, and don't promise a size different from the list.
 You can't do anything else: no knocking things down, fighting, fetching, crafting or flying. You never break anything the player built. If asked, say no politely, in character, with no action tag. Never pretend to do something you have no tag for.
@@ -170,8 +174,12 @@ Deno.serve(async (req) => {
       if (block.type === "text") text += block.text;
     }
     const mood = /^\s*\[annoyed\]/i.test(text) ? "annoyed" : "talking";
-    const tag = text.match(/\[do:\s*([a-z]+)\s*\]/i)?.[1]?.toLowerCase() ?? "";
-    const action = ACTIONS.includes(tag) ? tag : null;
+    // Every [do:...] tag, in order, keeping only real actions.
+    const actions = [...text.matchAll(/\[do:\s*([a-z]+)\s*\]/gi)]
+      .map((m) => m[1].toLowerCase())
+      .filter((a) => ACTIONS.includes(a))
+      .slice(0, MAX_ACTIONS);
+    const action = actions[0] ?? null;
     text = limitWords(cleanText(text.replace(/\[(talking|annoyed|do:[^\]]*)\]/gi, ""), MAX_MESSAGE_LENGTH));
     // Ran out of room mid-sentence? Keep only the finished sentences.
     if (response.stop_reason === "max_tokens") {
@@ -180,7 +188,7 @@ Deno.serve(async (req) => {
     }
     if (!text) return reply({ error: "No reply" }, 502);
 
-    return reply({ text, mood, action });
+    return reply({ text, mood, actions, action });
   } catch (error) {
     // Log the details here (visible in the Supabase dashboard), but don't send them to the browser.
     if (error instanceof Anthropic.APIError) console.error(`Claude API error ${error.status}:`, error.message);
