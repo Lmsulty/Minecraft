@@ -102,6 +102,46 @@ export const THEME = {
         ui: { '--page-bg': '#bfe8e4' },
       },
     },
+    lava: {
+      name: 'Lava planet',
+      seed: 4242,
+      changes: {
+        // Rugged hills of black glass, split by glowing orange cracks.
+        terrain: {
+          baseHeight: 46,
+          hillHeight: 13,   // steeper, craggier hills than home
+          caves: false,
+          spawnOn: 'black glass',
+          blocks: { surface: 'black glass', underSurface: 'black glass', rock: 'black glass' },
+          sand: { threshold: 99 }, // no sand
+          cracks: {
+            scale: 0.035,   // smaller = longer, straighter cracks, further apart
+            width: 0.07,    // bigger = wider cracks
+            depth: 3,       // how many blocks down the glow goes (shows in cliff sides)
+          },
+        },
+        trees: { chance: 0 },
+
+        // Dark red sky, never really blue. Same hours as home's keyframes.
+        skyKeyframes: [
+          { hour: 4,  name: 'night',   sky: '#1a0806', skyTop: '#060102', light: '#ff7a4a', lightStrength: 0.35, ambientSky: '#7a2c20', ambientGround: '#2a0c08', ambientStrength: 0.75,  cloudLit: '#3a1410', cloudShade: '#120606', stars: 0.8 },
+          { hour: 5,  name: 'dawn',    sky: '#3a1410', skyTop: '#140606', light: '#ff8a5a', lightStrength: 0.5,  ambientSky: '#7a3022', ambientGround: '#2a100a', ambientStrength: 0.55, cloudLit: '#6a2a1a', cloudShade: '#200a08', stars: 0.4 },
+          { hour: 6,  name: 'sunrise', sky: '#8a2e18', skyTop: '#3a1010', light: '#ffa060', lightStrength: 0.9,  ambientSky: '#c06040', ambientGround: '#3a1a10', ambientStrength: 0.75, cloudLit: '#c0582a', cloudShade: '#4a1810', stars: 0 },
+          { hour: 8,  name: 'day',     sky: '#7a2a1c', skyTop: '#3c0e0c', light: '#ffd0a0', lightStrength: 1.5,  ambientSky: '#ffb090', ambientGround: '#4a2018', ambientStrength: 1.0,  cloudLit: '#a04a30', cloudShade: '#4a1a14', stars: 0 },
+          { hour: 18, name: 'day',     sky: '#7a2a1c', skyTop: '#3c0e0c', light: '#ffd0a0', lightStrength: 1.5,  ambientSky: '#ffb090', ambientGround: '#4a2018', ambientStrength: 1.0,  cloudLit: '#a04a30', cloudShade: '#4a1a14', stars: 0 },
+          { hour: 19.5, name: 'sunset', sky: '#9a3418', skyTop: '#2a0a0a', light: '#ff8040', lightStrength: 0.9, ambientSky: '#d06a40', ambientGround: '#3a1810', ambientStrength: 0.75, cloudLit: '#d06030', cloudShade: '#501a12', stars: 0 },
+          { hour: 21, name: 'dusk',    sky: '#3a0e0a', skyTop: '#100404', light: '#ff7a4a', lightStrength: 0.4,  ambientSky: '#7a2c20', ambientGround: '#200a08', ambientStrength: 0.7,  cloudLit: '#4a1a12', cloudShade: '#160606', stars: 0.6 },
+          { hour: 22, name: 'night',   sky: '#1a0806', skyTop: '#060102', light: '#ff7a4a', lightStrength: 0.35, ambientSky: '#7a2c20', ambientGround: '#2a0c08', ambientStrength: 0.75,  cloudLit: '#3a1410', cloudShade: '#120606', stars: 0.8 },
+        ],
+        clouds: { coverage: 0.6 }, // smoky
+
+        // Closer than home, further than the water world: a medium-sized,
+        // fiery black hole (home's shape, just bigger).
+        blackHole: { size: 4.5, brightness: 1.3, glowAmount: 0.5 },
+
+        ui: { '--page-bg': '#3a0e0a' },
+      },
+    },
   },
 
   // ---- Terrain shape (logic in terrain.js) ----
@@ -112,6 +152,18 @@ export const THEME = {
     dirtDepth: 3,     // dirt layers under the grass
     caves: true,      // false = no tunnels, caverns, sinkholes or hillside entrances
     spawnOn: 'grass', // block name (blocks.js) you start the game standing on
+
+    // Which blocks (names from blocks.js) the ground is made of.
+    blocks: {
+      surface: 'grass',      // the top block
+      underSurface: 'dirt',  // the next dirtDepth blocks down
+      rock: 'stone',         // everything deeper (and under sand)
+    },
+
+    // Glowing cracks running across the ground (null = none). Each planet with
+    // cracks sets: scale (smaller = longer cracks, further apart), width, and
+    // depth (how many blocks down the glow goes).
+    cracks: null,
 
     // Sea: every gap between the ground and this height is filled with water.
     // 0 = no sea at all.
@@ -512,6 +564,18 @@ export const THEME = {
       seam: '#7a3517',      // top and left edges of each panel
       seamShade: '#62290f', // bottom and right edges
       stitch: '#ecc596',    // the ring of pale stitches
+    },
+    // ---- Lava planet blocks ----
+    blackGlass: {          // glassy black rock with a faint purple sheen
+      base: ['#1e1b24', '#232028', '#1a1720', '#26222c'],
+      sheen: '#3a3448',    // soft diagonal streaks of reflection
+      glint: '#8a7ca8',    // a few bright sparkles
+    },
+    emberCrack: {          // molten rock glowing up through the cracks (always lit, even at night)
+      glow: ['#ff7a1e', '#f26a16', '#ff8a2a'], // the orange glow
+      edge: '#b8380e',     // cooler dark red swirls
+      core: '#ffd36a',     // white-hot spots
+      crust: ['#1a1418', '#2a1a16'], // flakes of black crust floating on it
     },
     // ---- Water (only on planets with a sea) ----
     water: {               // shallow teal sea with soft ripples (how see-through: waterOpacity)

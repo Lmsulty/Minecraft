@@ -7,7 +7,7 @@ import { THEME, hexToRgb } from './theme.js';
 // (the "atlas") so every block can share a single material.
 
 const TILE = 16;        // pixels per tile side
-const ATLAS_TILES = 4;  // atlas is 4 x 4 tiles = 64 x 64 pixels (room for 16 textures)
+const ATLAS_TILES = 8;  // atlas is 8 x 8 tiles = 128 x 128 pixels (room for 64 textures)
 const ATLAS_SIZE = TILE * ATLAS_TILES;
 
 // ---- Colours: all come from theme.js ----
@@ -396,6 +396,44 @@ function paintWater(t, rand) {
   }
 }
 
+function paintBlackGlass(t, rand) {
+  // Glassy black rock: dark speckled base, a couple of soft diagonal streaks
+  // of reflection, and a few bright glints.
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.blackGlass.base));
+  }
+  for (const start of [3, 11]) {
+    for (let k = 0; k < 9; k++) {
+      if (rand() < 0.8) t.set(start + k, k + Math.floor(rand() * 2), C.blackGlass.sheen);
+    }
+  }
+  for (let i = 0; i < 3; i++) {
+    t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), C.blackGlass.glint);
+  }
+}
+
+function paintEmberCrack(t, rand) {
+  // Molten rock seen through a crack: glowing orange with darker red swirls,
+  // white-hot spots, and a few flakes of black crust floating on top. A line
+  // of these blocks across the ground reads as one glowing crack.
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) {
+      // Soft wavy bands of hotter and cooler rock.
+      const wave = Math.sin(x * 0.7 + Math.sin(y * 0.5) * 2) + Math.sin(y * 0.9 - x * 0.3);
+      const color = wave > 1.1 ? C.emberCrack.core : wave < -0.9 ? C.emberCrack.edge : pick(rand, C.emberCrack.glow);
+      t.set(x, y, color);
+    }
+  }
+  // Flakes of black crust: small clumps of 1-3 pixels.
+  for (let i = 0; i < 7; i++) {
+    const x = Math.floor(rand() * TILE);
+    const y = Math.floor(rand() * TILE);
+    t.set(x, y, pick(rand, C.emberCrack.crust));
+    if (rand() < 0.6) t.set(x + 1, y, pick(rand, C.emberCrack.crust));
+    if (rand() < 0.4) t.set(x, y + 1, pick(rand, C.emberCrack.crust));
+  }
+}
+
 const PAINTERS = {
   grass_top: paintGrassTop,
   grass_side: paintGrassSide,
@@ -413,6 +451,8 @@ const PAINTERS = {
   glass: paintGlass,
   felt: paintFelt,
   water: paintWater,
+  black_glass: paintBlackGlass,
+  ember_crack: paintEmberCrack,
 };
 const TILE_NAMES = Object.keys(PAINTERS);
 

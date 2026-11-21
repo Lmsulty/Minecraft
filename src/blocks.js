@@ -19,6 +19,9 @@ export const BLOCK = {
   FELT: 12,
   // Made by the world on planets with a sea (never carried or placed):
   WATER: 13,
+  // Made by the world on the lava planet:
+  BLACK_GLASS: 14,
+  EMBER_CRACK: 15,
 };
 
 // Indexed by block id.
@@ -101,6 +104,18 @@ export const BLOCK_TYPES = [
     id: BLOCK.WATER, name: 'water', solid: false, opaque: false, renderType: 'water', blocksLight: false,
     liquid: true, breakable: false,
     textures: { top: 'water', side: 'water', bottom: 'water' },
+  },
+  {
+    // The ground of the lava planet: glassy black rock.
+    id: BLOCK.BLACK_GLASS, name: 'black glass', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
+    textures: { top: 'black_glass', side: 'black_glass', bottom: 'black_glass' },
+  },
+  {
+    // Black glass split by glowing orange cracks. Always bright (even at night)
+    // and lights up the dark around it, like the glow lamp.
+    id: BLOCK.EMBER_CRACK, name: 'ember crack', solid: true, opaque: true, renderType: 'glow', blocksLight: true,
+    emitsLight: true,
+    textures: { top: 'ember_crack', side: 'ember_crack', bottom: 'ember_crack' },
   },
 ];
 

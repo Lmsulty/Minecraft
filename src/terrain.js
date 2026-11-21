@@ -1,5 +1,5 @@
 import { createNoise2D, createNoise3D } from 'simplex-noise';
-import { BLOCK } from './blocks.js';
+import { BLOCK, BLOCK_TYPES } from './blocks.js';
 import { makeRandom } from './random.js';
 import { treeAtColumn, treeBlockAt } from './trees.js';
 import { THEME } from './theme.js';
@@ -20,6 +20,17 @@ const T = THEME.terrain;
 const SAND = T.sand;
 const SEA_LEVEL = T.seaLevel; // 0 = no sea
 const SEA_SLOPE = 4;          // the sea gets 1 block deeper for every this many blocks the ground drops
+const CRACKS = T.cracks;      // glowing cracks across the ground (null = none)
+
+// The blocks the ground is made of on this planet (THEME.terrain.blocks).
+function blockIdByName(name) {
+  const id = BLOCK_TYPES.findIndex((type) => type.name === name);
+  if (id === -1) throw new Error(`theme.js terrain: no block called "${name}"`);
+  return id;
+}
+const SURFACE = blockIdByName(T.blocks.surface);
+const UNDER_SURFACE = blockIdByName(T.blocks.underSurface);
+const ROCK = blockIdByName(T.blocks.rock);
 
 // ---- Cave settings ----
 const CAVE_MIN_Y = 2;          // caves never go below this, so the floor stays thick
@@ -95,6 +106,8 @@ export class Terrain {
     this.cavern = createNoise3D(rand);
     // Sand gets its own random numbers, so adding it never changed the hills or caves.
     this.sandNoise = createNoise2D(makeRandom((seed ^ 0x5a4d5a4d) >>> 0));
+    // So do the cracks (only planets with cracks use them).
+    this.crackNoise = createNoise2D(makeRandom((seed ^ 0x3c6ef372) >>> 0));
     // No caves on this planet = no starter sinkhole either.
     this.starter = T.caves ? this.pickStarterSinkhole() : null;
   }
@@ -142,7 +155,8 @@ export class Terrain {
   // Like column(), but without trees: just the ground and the caves in it.
   groundColumn(x, z) {
     const height = this.height(x, z);
-    if (!T.caves) return { height, sinkholes: [], tunnels: [], sand: this.isSandy(x, z, height) };
+    const crack = this.isCracked(x, z);
+    if (!T.caves) return { height, sinkholes: [], tunnels: [], sand: this.isSandy(x, z, height), crack };
     // Sinkholes close enough to carve this column: the one in this cell, and the starter.
     const sinkholes = [];
     for (const s of [this.sinkholeFor(x, z), this.starter]) {
@@ -151,7 +165,15 @@ export class Terrain {
     // Hillside tunnels passing over/under this column.
     const nearby = this.tunnelsNearCell(Math.floor(x / HILLSIDE_CELL), Math.floor(z / HILLSIDE_CELL));
     const tunnels = nearby.filter((t) => x >= t.minX && x <= t.maxX && z >= t.minZ && z <= t.maxZ);
-    return { height, sinkholes, tunnels, sand: this.isSandy(x, z, height) };
+    return { height, sinkholes, tunnels, sand: this.isSandy(x, z, height), crack };
+  }
+
+  // Does a glowing crack run through column (x, z)? (see THEME.terrain.cracks)
+  // Cracks follow the lines where a smooth wavy pattern passes through zero,
+  // so they wind across the ground and join up into a network.
+  isCracked(x, z) {
+    if (!CRACKS) return false;
+    return Math.abs(this.crackNoise(x * CRACKS.scale, z * CRACKS.scale)) < CRACKS.width;
   }
 
   // Is the ground at column (x, z) sand instead of grass? (see SAND settings)
@@ -212,7 +234,7 @@ export class Terrain {
       for (let dz = -radius; dz <= radius; dz++) {
         const col = this.groundColumn(x + dx, z + dz);
         const ground = this.blockInColumn(x + dx, col.height, z + dz, col);
-        if (dx === 0 && dz === 0 ? ground !== BLOCK.GRASS : ground === BLOCK.AIR) return false;
+        if (dx === 0 && dz === 0 ? ground !== SURFACE : ground === BLOCK.AIR) return false;
       }
     }
     return true;
@@ -435,10 +457,11 @@ export class Terrain {
       return tree === BLOCK.AIR && y <= SEA_LEVEL ? BLOCK.WATER : tree;
     }
     if (this.isCave(x, y, z, col)) return BLOCK.AIR;
-    if (col.sand) return y > col.height - SAND.depth ? BLOCK.SAND : BLOCK.STONE;
-    if (y === col.height) return BLOCK.GRASS;
-    if (y >= col.height - T.dirtDepth) return BLOCK.DIRT;
-    return BLOCK.STONE;
+    if (col.crack && y > col.height - CRACKS.depth) return BLOCK.EMBER_CRACK;
+    if (col.sand) return y > col.height - SAND.depth ? BLOCK.SAND : ROCK;
+    if (y === col.height) return SURFACE;
+    if (y >= col.height - T.dirtDepth) return UNDER_SURFACE;
+    return ROCK;
   }
 
   // The original block at (x, y, z), before anyone changed it.
