@@ -37,6 +37,9 @@ import { KevinTag } from './kevinTag.js';
 // so far that his patch of ground unloads, he just waits there, frozen,
 // until you come back. Tell him to FOLLOW and he's back to normal (and
 // teleports to you if you're far away).
+//
+// While he's BUILDING something (kevinBuild.js) he also stays put, turns to
+// watch each block go in, blinks his antenna and shows his thinking face.
 
 // ==========================================================
 //  PERSONAL SPACE: tweak these to change how close he stays.
@@ -170,6 +173,8 @@ export class Kevin {
 
     this.mode = 'idle';       // 'idle', 'follow' or 'backoff'
     this.staying = false;     // true = you told him to stay put (kevinActions.js)
+    this.working = false;     // true = building something (kevinBuild.js)
+    this.workTarget = null;   // the block he last placed (he faces it)
     this.mood = 'idle';       // face to show: 'idle' or 'thinking' (talking and annoyed win over these)
     this.talking = false;     // set by kevinTalk.js while he's saying something
     this.clock = 0;           // seconds since the game started (for the antenna blink)
@@ -209,6 +214,35 @@ export class Kevin {
   // Back to following you around (checkLost() teleports him if you're far away).
   follow() {
     this.staying = false;
+  }
+
+  // Building (kevinBuild.js): stand still while the blocks go in.
+  startWork() {
+    this.working = true;
+    this.mode = 'idle';
+    this.workTarget = null;
+  }
+
+  stopWork() {
+    this.working = false;
+    this.workTarget = null;
+    this.stuckTime = 0;
+    this.progressTime = 0;
+    this.heightTime = 0;
+  }
+
+  // He just placed block { x, y, z }: look at it.
+  workAt(block) {
+    this.workTarget = block;
+  }
+
+  // Would his body be in block (bx, by, bz)? (Same check as the player's.)
+  overlapsBlock(bx, by, bz) {
+    const p = this.body.position;
+    const r = this.body.halfWidth;
+    return p.x - r < bx + 1 && p.x + r > bx &&
+      p.y < by + 1 && p.y + this.body.height > by &&
+      p.z - r < bz + 1 && p.z + r > bz;
   }
 
   // What's happened since last asked (and forget them).
@@ -291,8 +325,8 @@ export class Kevin {
     const toPlayer = angleTowards(b.position.x, b.position.z, p.x, p.z);
 
     // Switch modes. The gaps between the numbers stop him flicking back and forth.
-    if (this.staying) {
-      this.mode = 'idle'; // told to stay: no following, no backing off
+    if (this.staying || this.working) {
+      this.mode = 'idle'; // told to stay, or busy building: no following, no backing off
     } else {
       if (this.mode === 'follow' && distance < STOP_FOLLOWING) this.mode = 'idle';
       else if (this.mode !== 'follow' && distance > START_FOLLOWING) this.startFollowing();
@@ -317,6 +351,10 @@ export class Kevin {
     } else if (this.mode === 'backoff') {
       b.goal = toPlayer + Math.PI; // step away from you
       speed = this.probe(b.goal) ? BACK_OFF_SPEED : 0;
+    } else if (this.working && this.workTarget) {
+      // Building: watch the block he just placed.
+      const t = this.workTarget;
+      b.goal = angleTowards(b.position.x, b.position.z, t.x + 0.5, t.z + 0.5);
     } else {
       // Idle: mostly looks at you, but glances around now and then.
       this.lookTimer -= dt;
@@ -451,8 +489,9 @@ export class Kevin {
     const b = this.body;
     const p = this.player.position;
 
-    // Told to stay: never teleport to you (only if he somehow falls out of the world).
-    if (this.staying) {
+    // Told to stay, or building: never teleport to you (only if he somehow
+    // falls out of the world).
+    if (this.staying || this.working) {
       this.stuckTime = 0;
       this.progressTime = 0;
       this.heightTime = 0;
@@ -489,7 +528,8 @@ export class Kevin {
 
   // Appear on a safe spot near the player: preferably just behind them (so
   // you don't see him pop in), at about the same height.
-  teleport() {
+  // quiet = true: he doesn't remark on it (e.g. hopping out of a build's way).
+  teleport({ quiet = false } = {}) {
     const b = this.body;
     const p = this.player.position;
     const spot = this.findSpotNear(3) ?? this.findSpotNear(10) ?? { x: p.x, y: p.y, z: p.z };
@@ -500,7 +540,7 @@ export class Kevin {
     b.stun = 0;
     b.yaw = b.goal = angleTowards(spot.x, spot.z, p.x, p.z);
     b.flash = 0.8; // a little flash as he beams in
-    this.events?.push('teleport');
+    if (!quiet) this.events?.push('teleport');
     this.mode = 'idle';
     this.stuckTime = 0;
     this.progressTime = 0;
@@ -576,9 +616,9 @@ export class Kevin {
 
   draw(dt) {
     const b = this.body;
-    // The antenna tip blinks while he talks.
+    // The antenna tip blinks while he talks or builds.
     this.clock += dt;
-    b.glow = this.talking && Math.sin(this.clock * ANTENNA_BLINK * Math.PI * 2) < 0 ? 0.3 : 1;
+    b.glow = (this.talking || this.working) && Math.sin(this.clock * ANTENNA_BLINK * Math.PI * 2) < 0 ? 0.3 : 1;
     this.renderer.draw([b], this.camera);
 
     // The face panel sits in front of his head, and bobs with his body
@@ -592,7 +632,8 @@ export class Kevin {
     screenMatrix.makeScale(SCREEN.width, SCREEN.height, 1)
       .setPosition(SCREEN.at[0], SCREEN.at[1] + bob, SCREEN.at[2])
       .premultiply(bodyMatrix);
-    const expression = this.annoyedTimer > 0 ? 'annoyed' : this.talking ? 'talking' : this.mood;
+    const expression = this.annoyedTimer > 0 ? 'annoyed' : this.talking ? 'talking'
+      : this.working ? 'thinking' : this.mood;
     this.face.update(dt, expression, screenMatrix);
 
     this.headPoint.set(b.position.x, b.position.y + TAG_HEIGHT + bob, b.position.z);

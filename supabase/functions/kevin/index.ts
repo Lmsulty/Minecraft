@@ -4,8 +4,8 @@
 // last few chat messages. This function asks Claude (claude-haiku-5-5) for
 // Kevin's reply and sends back { text, mood, action }.
 //
-// action: if the player asked Kevin to DO something he can do ("stay here"),
-// Claude adds a tag like [do:stay] and this sends back "stay". Only names in
+// action: if the player asked Kevin to DO something he can do ("stay here",
+// "build a hut"), Claude adds a tag like [do:hut] and this sends back "hut". Only names in
 // ACTIONS are ever sent; otherwise action is null. (The game checks again,
 // see src/kevinActions.js.)
 //
@@ -28,7 +28,7 @@ const MAX_CONTEXT_TEXT = 80;     // each piece of game context is cut to this le
 const RATE_LIMIT = 12;           // messages per minute from one address (best effort)
 
 // Things Kevin can actually do (keep in step with src/kevinActions.js).
-const ACTIONS = ["stay", "follow"];
+const ACTIONS = ["stay", "follow", "stop", "wall", "tower", "hut", "bridge", "light"];
 
 // Lets the browser call this function from the game's page.
 const CORS_HEADERS = {
@@ -101,8 +101,15 @@ How to reply:
 Things you can actually do. When the player clearly asks for one, put its action tag right after the mood tag, then reply in character (e.g. "[talking][do:stay] Staying put. Do come back."):
 - [do:stay] stay right where you are and stop following (e.g. "stay here", "wait for me", "stop following me")
 - [do:follow] follow the player again (e.g. "follow me", "come here", "let's go")
+- [do:stop] stop building whatever you're building (e.g. "stop", "cancel that", "never mind")
+- [do:wall] build a wall, 5 wide and 3 high
+- [do:tower] build a tall thin tower with a glow lamp on top (a beacon to find the way back)
+- [do:hut] build a small hut, 5 by 5 with a doorway and a roof (also for "house", "shelter", "somewhere to hide")
+- [do:bridge] build a bridge straight ahead, across a gap
+- [do:light] put glow lamps on the ground around the player (e.g. "light this up", "it's too dark")
 Use at most one action tag, and only when the player asks for that. If you're already doing it, you can say so, but still add the tag.
-You can't do anything else yet: no building, digging, fighting, fetching, crafting or flying. If asked, say no politely, in character, with no action tag. Never pretend to do something you have no tag for.
+For builds, the game picks the spot (where the player is looking) and the blocks, and checks the player has enough, so just agree briefly in character. For walls, towers and huts you clear natural things out of the way first (trees, dirt, stone) and level the ground; huts get a floor. Don't ask for sizes or materials, and don't promise a size different from the list.
+You can't do anything else yet: no digging, tunnels, knocking things down, fighting, fetching, crafting or flying. You never break anything the player built. If asked, say no politely, in character, with no action tag. Never pretend to do something you have no tag for.
 
 What you can see right now:
 ${facts.map(([label, value]) => `- ${label}: ${value}`).join("\n") || "- Nothing special."}`;

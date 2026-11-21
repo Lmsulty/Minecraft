@@ -1,4 +1,4 @@
-import { askKevin, isOnlineBrainConfigured } from './kevinReply.js';
+import { askKevin, isOnlineBrainConfigured, correctLastReply } from './kevinReply.js';
 import { runAction } from './kevinActions.js';
 import { getKevinName } from './kevinName.js';
 import { displayName } from './items.js';
@@ -16,16 +16,19 @@ import { displayName } from './items.js';
 // bubble, caption if he's out of sight, and voice), through kevinTalk.js.
 //
 // The reply itself comes from askKevin() in kevinReply.js. If it comes with
-// an action ("stay here", "follow me"), kevinActions.js makes him do it.
+// an action ("stay here", "build a hut"), kevinActions.js makes him do it.
+// If the game finds it can't be done (not enough blocks, say), he says why
+// instead of his reply, so he never promises something and then doesn't do it.
 
 const MAX_MESSAGE_LENGTH = 300;
 const LOG_LENGTH = 6; // messages shown in the box
 
 export class KevinChat {
-  constructor(element, { player, kevin, talk, hotbar, inventory, mobs, dayNight }) {
+  constructor(element, { player, kevin, builder, talk, hotbar, inventory, mobs, dayNight }) {
     this.element = element;
     this.player = player;
     this.kevin = kevin;
+    this.builder = builder; // KevinBuilder (kevinBuild.js)
     this.talk = talk;
     this.hotbar = hotbar;
     this.inventory = inventory;
@@ -93,11 +96,16 @@ export class KevinChat {
       .then((answer) => {
         this.waiting = false;
         this.kevin.mood = 'idle';
+        // An order ("stay here", "build a hut")? Do it, and remember it for later chats.
+        const { note, line } = runAction(answer.action, { kevin: this.kevin, builder: this.builder });
+        if (note) this.talk.note(note);
+        // Can't be done? He says why instead.
+        if (line) {
+          answer = line;
+          correctLastReply(line.text);
+        }
         this.addToLog(getKevinName(), answer.text);
         this.talk.say(answer); // bubble, caption and voice, like his other lines
-        // An order ("stay here")? Do it, and remember it for later chats.
-        const note = runAction(answer.action, this.kevin);
-        if (note) this.talk.note(note);
       });
   }
 
@@ -143,8 +151,10 @@ export class KevinChat {
       nearbyCreatures: creatures || 'none',
       recentEvents: this.talk.recentEventsText() || 'nothing much',
       mode: this.inventory.creative ? 'creative (unlimited blocks)' : 'survival',
-      kevinState: this.kevin.staying ? 'staying put where the player told you to' : 'following the player',
+      kevinState: this.builder.describe() ??
+        (this.kevin.staying ? 'staying put where the player told you to' : 'following the player'),
       kevinStaying: this.kevin.staying, // for the offline brain
+      kevinBusy: this.builder.busy,     // for the offline brain
     };
   }
 }

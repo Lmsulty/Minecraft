@@ -84,7 +84,14 @@ async function askServer(message, context) {
 async function askOffline(message, context) {
   const [a, b] = OFFLINE_THINKING;
   await new Promise((resolve) => setTimeout(resolve, (a + Math.random() * (b - a)) * 1000));
-  return offlineReply(message, { staying: Boolean(context?.kevinStaying) });
+  return offlineReply(message, { staying: Boolean(context?.kevinStaying), busy: Boolean(context?.kevinBusy) });
+}
+
+// He ended up saying something else (the game found his action couldn't be
+// done), so remember what he really said, not the reply he didn't use.
+export function correctLastReply(text) {
+  const last = history[history.length - 1];
+  if (last?.from === 'kevin') last.text = text;
 }
 
 function remember(from, text) {

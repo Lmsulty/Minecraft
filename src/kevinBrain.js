@@ -179,6 +179,94 @@ const LINES = {
     'I am following you. That\'s rather my whole job.',
     'Already on your heels. Have you not noticed?',
   ],
+  // You asked him to build something ({thing} = wall, tower, hut or bridge).
+  build: [
+    'One {thing}, coming up. Do stand back.',
+    'A {thing}? If you insist. Watch and learn.',
+    'Building a {thing}. Try not to get in the way.',
+    'Right. One {thing}, slightly better than you\'d manage.',
+  ],
+  // You asked for lamps.
+  lightUp: [
+    'Lamps. Yes. Some of us can\'t see in the dark.',
+    'Let there be light. Well, a few lamps.',
+    'Brightening things up. Unlike your mood, apparently.',
+  ],
+  // He finished building ({thing}).
+  built: [
+    'Done. One {thing}. You may applaud.',
+    'There. A perfectly respectable {thing}.',
+    'Finished. Do admire the craftsmanship.',
+    'Your {thing} is ready. No need to thank me. Although you could.',
+  ],
+  // He finished the lamps.
+  litUp: [
+    'There. Now you can see what you\'re falling into.',
+    'All lit. Rather cosy, actually.',
+  ],
+  // You told him to stop building.
+  stop: [
+    'Stopping. Half a masterpiece it is, then.',
+    'Fine. I\'ll leave it there. Very modern.',
+    'Tools down. Not that I have tools.',
+  ],
+  // ...but he wasn't doing anything.
+  nothingToStop: [
+    'Stop what? I\'m not doing anything. Masterfully.',
+    'I\'m already stopped. It\'s my natural state.',
+  ],
+  // He ran out of blocks halfway ({block}).
+  outOfBlocks: [
+    'I\'ve run out of {block}. Did you drop some?',
+    'No more {block}, I\'m afraid. It\'ll have to do.',
+  ],
+  // You walked off while he was building ({thing}).
+  abandoned: [
+    'You wandered off, so I stopped the {thing}. Rude.',
+    'Building a {thing} for nobody. I gave up.',
+  ],
+  // Can't build: not enough blocks (survival). {count} needed, {have} of {block}.
+  notEnough: [
+    'That needs {count} {block}. You\'ve got {have}. Ambitious.',
+    'I\'d need {count} {block}. You have {have}. Do the maths.',
+    '{count} {block}, please. You\'ve only got {have}.',
+  ],
+  // Can't build: no blocks at all (survival).
+  noBlocks: [
+    'Build it out of what, exactly? You\'ve no blocks.',
+    'Your pockets are empty. I can\'t build with good intentions.',
+  ],
+  // Can't light up: no glow lamps (survival). {count} needed.
+  noLamps: [
+    'You\'ve no glow lamps. Craft {count}, then ask me nicely.',
+    'Lamps don\'t grow on trees. Craft some first. {count} should do.',
+  ],
+  // Can't build: there's something in the way everywhere it would go.
+  noRoom: [
+    'There\'s no room for it there. I don\'t knock your things down.',
+    'Everything there is already full. Point me somewhere emptier.',
+  ],
+  // Can't build: your own blocks are in the way everywhere near there.
+  yoursInTheWay: [
+    'Your own blocks are in the way, and I don\'t touch those. Point me somewhere else.',
+    'There\'s your handiwork in the way. I shan\'t knock it down. Try another spot.',
+  ],
+  // Can't build: the ground there is too steep or full of holes.
+  tooBumpy: [
+    'The ground there is far too lumpy. Find me somewhere flatter.',
+    'I\'m a builder, not a miracle worker. Somewhere flatter, please.',
+  ],
+  // Can't build a bridge: no gap ahead.
+  noGap: [
+    'A bridge over what? It\'s all ground. Face the gap.',
+    'There\'s nothing to cross. Look at the gap, then ask.',
+  ],
+  // You said build, but not what.
+  buildWhat: [
+    'Build what? A wall, a tower, a hut or a bridge. Do be specific.',
+    'I do walls, towers, huts and bridges. Pick one.',
+  ],
+
   // You asked for something he can't do (yet).
   cantDo: [
     'I\'d love to. Well, no. But I can\'t anyway.',
@@ -201,7 +289,8 @@ const TOPICS = [
   { topic: 'insult', words: /\b(stupid|dumb|idiot|useless|ugly|hate you|shut up|loser|trash|bad robot|annoying)\b/ },
   { topic: 'thanks', words: /\b(thanks|thank you|thx|ty|cheers)\b/ },
   { topic: 'help', words: /\b(help|how do i|how to|what do i|stuck|lost|tip|hint|confused)\b/ },
-  { topic: 'cantDo', words: /\b(build|dig|make me|craft me|fetch|get me|bring me|attack|kill|fight|destroy|knock down|fly)\b/ },
+  { topic: 'cantDo', words: /\b(dig|tunnel|craft me|fetch|get me|bring me|attack|kill|fight|destroy|knock down|fly)\b/ },
+  { topic: 'buildWhat', words: /\b(build|make)\b/ },
   { topic: 'blackHoleQuestion', words: /\b(black ?hole|hole in the sky|swirl)\b/ },
   { topic: 'night', words: /\b(night|dark|scared|afraid)\b/ },
   { topic: 'howAreYou', words: /\b(how are you|how r u|how's it going|you ok|you good)\b/ },
@@ -215,17 +304,20 @@ const MOODS = { insult: 'annoyed', hit: 'annoyed', hitStreak: 'annoyed' };
 const RECENT_MEMORY = 3; // never repeats any of its last 3 lines of a kind
 const recent = {};       // kind -> the last few lines used
 
-// A line of this kind, not one used recently. `count` fills in {count}.
+// A line of this kind, not one used recently. `count` fills in {count},
+// and `fill` fills in anything else, e.g. { block: 'planks' } -> {block}.
 // Returns { text, mood }.
-export function pickLine(kind, count = 0) {
+export function pickLine(kind, count = 0, fill = {}) {
   const lines = LINES[kind] ?? LINES.unknown;
   const used = (recent[kind] ??= []);
   const fresh = lines.filter((line) => !used.includes(line));
   const line = fresh[Math.floor(Math.random() * fresh.length)] ?? lines[0];
   used.push(line);
   if (used.length > Math.min(RECENT_MEMORY, lines.length - 1)) used.shift();
+  let text = line.replaceAll('{name}', getKevinName()).replaceAll('{count}', String(count));
+  for (const [key, value] of Object.entries(fill)) text = text.replaceAll(`{${key}}`, String(value));
   return {
-    text: line.replaceAll('{name}', getKevinName()).replaceAll('{count}', String(count)),
+    text,
     mood: MOODS[kind] ?? 'talking',
   };
 }
@@ -235,13 +327,16 @@ export function pickLine(kind, count = 0) {
 // `staying` = is he staying put right now (so he can say "I already am").
 // (The chat goes through askKevin() in kevinReply.js, which uses this when
 // the server isn't available.)
-export function offlineReply(message, { staying = false } = {}) {
+export function offlineReply(message, { staying = false, busy = false } = {}) {
   const text = message.toLowerCase();
 
   // An order? (Checked first: "stop following me, you idiot" is still an order.)
   const action = findAction(text);
   if (action === 'stay') return { ...pickLine(staying ? 'alreadyStaying' : 'stay'), action };
   if (action === 'follow') return { ...pickLine(staying ? 'follow' : 'alreadyFollowing'), action };
+  if (action === 'stop') return { ...pickLine(busy ? 'stop' : 'nothingToStop'), action };
+  if (action === 'light') return { ...pickLine('lightUp'), action };
+  if (action) return { ...pickLine('build', 0, { thing: action }), action }; // wall, tower, hut, bridge
 
   // Saying his name on its own counts as a hello.
   if (text.trim() === getKevinName().toLowerCase()) return { ...pickLine('greeting'), action: null };

@@ -221,6 +221,7 @@ export const THEME = {
       rivet: '#c9d3de',      // rivets and the knobs on the side of his head
       antenna: '#3c4552',
       tip: '#ff6b4a',        // glowing antenna tip
+      buildSparkle: '#8affd0', // the beam and sparkle when he places a block (kevinBuild.js)
       // His face (kevinFace.js). The screen always shines, even at night.
       screenBg: '#0b2320',   // dark green-black screen
       screenLines: '#0f2b27', // faint TV lines across it

@@ -118,6 +118,19 @@ export class World {
     return isSolidId(this.getBlock(x, y, z));
   }
 
+  // Is the block at (x, y, z) still exactly what the world made there
+  // (terrain, trees)? False if the player (or Kevin) has ever changed it,
+  // i.e. placed a block there or broken what was there.
+  isNatural(x, y, z) {
+    x = Math.floor(x);
+    y = Math.floor(y);
+    z = Math.floor(z);
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const edits = this.editStore.forChunk(this.chunkKey(cx, cz));
+    return !edits?.has(`${x - cx * CHUNK_SIZE},${y},${z - cz * CHUNK_SIZE}`);
+  }
+
   // Y of the first air block above the ground at column (x, z).
   getSurfaceY(x, z) {
     for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
