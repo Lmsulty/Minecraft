@@ -2,6 +2,7 @@ import { createNoise2D, createNoise3D } from 'simplex-noise';
 import { BLOCK } from './blocks.js';
 import { makeRandom } from './random.js';
 import { treeAtColumn, treeBlockAt } from './trees.js';
+import { THEME } from './theme.js';
 
 // Decides what the untouched world looks like at any spot: hills, caves,
 // sinkholes and hillside entrances leading into them, sand in low ground, trees, and the unbreakable floor. It only uses seeded noise, so the same seed always
@@ -13,22 +14,12 @@ import { treeAtColumn, treeBlockAt } from './trees.js';
 // "starter" sinkhole is placed where it can be seen from here.
 export const SPAWN = { x: 8, z: 8 };
 
-// ---- Surface settings ----
-const BASE_HEIGHT = 48;  // average ground level (world is 96 tall)
-const HILL_HEIGHT = 8;   // how far hills rise/fall from the average
-const DIRT_DEPTH = 3;    // dirt layers under the grass
-
-// ---- Sand settings ----
-// Patches of sand form in low-lying ground (hollows and valleys), like
-// dried-up ponds. A column is sand if it's low enough AND its "sand noise"
-// (a seeded pattern of blobs) plus a bonus for being extra low is high enough.
-const SAND = {
-  maxHeight: 45,      // ground must be at or below this height (average ground is 48)
-  patchScale: 0.06,   // smaller = bigger, smoother patches
-  threshold: 0.15,    // -1 to 1. Bigger = fewer, smaller patches; -1 = every low spot
-  lowlandBonus: 0.12, // each block lower than maxHeight makes sand this much more likely
-  depth: 3,           // sand layers, counting the top one. Stone underneath.
-};
+// ---- Surface, sand and sea settings ----
+// These live in theme.js (THEME.terrain), because each planet has its own.
+const T = THEME.terrain;
+const SAND = T.sand;
+const SEA_LEVEL = T.seaLevel; // 0 = no sea
+const SEA_SLOPE = 4;          // the sea gets 1 block deeper for every this many blocks the ground drops
 
 // ---- Cave settings ----
 const CAVE_MIN_Y = 2;          // caves never go below this, so the floor stays thick
@@ -104,7 +95,8 @@ export class Terrain {
     this.cavern = createNoise3D(rand);
     // Sand gets its own random numbers, so adding it never changed the hills or caves.
     this.sandNoise = createNoise2D(makeRandom((seed ^ 0x5a4d5a4d) >>> 0));
-    this.starter = this.pickStarterSinkhole();
+    // No caves on this planet = no starter sinkhole either.
+    this.starter = T.caves ? this.pickStarterSinkhole() : null;
   }
 
   // Y of the grass block at column (x, z).
@@ -113,7 +105,27 @@ export class Terrain {
     const n =
       this.noise2D(x * 0.02, z * 0.02) * 0.75 +
       this.noise2D(x * 0.07, z * 0.07) * 0.25;
-    return Math.floor(BASE_HEIGHT + n * HILL_HEIGHT);
+    const h = Math.floor(T.baseHeight + n * T.hillHeight);
+    if (h >= SEA_LEVEL) return h; // dry land (always, on planets with no sea)
+    // Under the sea: raise deep ground so the sea stays shallow. Near the
+    // shore it's 1 block deep, then slowly deeper, up to maxSeaDepth.
+    const drop = SEA_LEVEL - h;
+    return SEA_LEVEL - Math.min(T.maxSeaDepth, Math.ceil(drop / SEA_SLOPE));
+  }
+
+  // The nearest dry land to column (x, z): somewhere to stand when you arrive.
+  // Searches in growing squares. On planets with no sea, that's (x, z) itself.
+  findLand(x, z) {
+    if (!SEA_LEVEL) return { x, z };
+    const isDry = (px, pz) => this.height(px, pz) > SEA_LEVEL; // at least 1 block above the water
+    for (let r = 0; r <= 600; r += 2) {
+      for (let d = -r; d <= r; d += 2) {
+        for (const [px, pz] of [[x + d, z - r], [x + d, z + r], [x - r, z + d], [x + r, z + d]]) {
+          if (isDry(px, pz)) return { x: px, z: pz };
+        }
+      }
+    }
+    return { x, z }; // (never expected: no land anywhere nearby)
   }
 
   // Everything about a column that doesn't change with height. Worked out
@@ -122,12 +134,15 @@ export class Terrain {
     const col = this.groundColumn(x, z);
     col.tree = treeAtColumn(this, x, z); // tree trunk/leaves above this column, or null
     // Highest block this column can have (used to know how far up to fill).
-    col.top = col.tree ? Math.max(col.height, col.tree.top) : col.height;
+    // Water reaches up to sea level, so fill at least that high.
+    col.top = Math.max(col.tree ? col.tree.top : col.height, col.height, SEA_LEVEL);
     return col;
   }
 
   // Like column(), but without trees: just the ground and the caves in it.
   groundColumn(x, z) {
+    const height = this.height(x, z);
+    if (!T.caves) return { height, sinkholes: [], tunnels: [], sand: this.isSandy(x, z, height) };
     // Sinkholes close enough to carve this column: the one in this cell, and the starter.
     const sinkholes = [];
     for (const s of [this.sinkholeFor(x, z), this.starter]) {
@@ -136,7 +151,6 @@ export class Terrain {
     // Hillside tunnels passing over/under this column.
     const nearby = this.tunnelsNearCell(Math.floor(x / HILLSIDE_CELL), Math.floor(z / HILLSIDE_CELL));
     const tunnels = nearby.filter((t) => x >= t.minX && x <= t.maxX && z >= t.minZ && z <= t.maxZ);
-    const height = this.height(x, z);
     return { height, sinkholes, tunnels, sand: this.isSandy(x, z, height) };
   }
 
@@ -179,14 +193,15 @@ export class Terrain {
   canGrowTree(x, z, radius) {
     const keepClear = radius + 2;
     if (Math.hypot(x - SPAWN.x, z - SPAWN.z) < keepClear + 1) return false;
-    if (distanceToLine(x + 0.5, z + 0.5, SPAWN.x + 0.5, SPAWN.z + 0.5, this.starter.x, this.starter.z) < keepClear) {
+    if (this.starter &&
+        distanceToLine(x + 0.5, z + 0.5, SPAWN.x + 0.5, SPAWN.z + 0.5, this.starter.x, this.starter.z) < keepClear) {
       return false;
     }
     // Sinkholes: the starter, and any in this or the neighbouring sinkhole cells.
-    const nearbySinkholes = [this.starter];
+    const nearbySinkholes = T.caves ? [this.starter] : [];
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        nearbySinkholes.push(this.sinkholeFor(x + dx * SINKHOLE_CELL, z + dz * SINKHOLE_CELL));
+        if (T.caves) nearbySinkholes.push(this.sinkholeFor(x + dx * SINKHOLE_CELL, z + dz * SINKHOLE_CELL));
       }
     }
     for (const s of nearbySinkholes) {
@@ -386,7 +401,7 @@ export class Terrain {
 
   // Is (x, y, z) hollowed out by a cave?
   isCave(x, y, z, col) {
-    if (y < CAVE_MIN_Y) return false;
+    if (!T.caves || y < CAVE_MIN_Y) return false;
     for (const s of col.sinkholes) {
       if (this.inSinkhole(x, y, z, s)) return true;
     }
@@ -414,11 +429,15 @@ export class Terrain {
   blockInColumn(x, y, z, col) {
     if (y === 0) return BLOCK.CORE;               // unbreakable floor
     // Above the ground: a tree, or open air. (Trees never fill caves.)
-    if (y > col.height) return col.tree ? treeBlockAt(col.tree, x, y, z) : BLOCK.AIR;
+    // Below sea level, the open space is water instead.
+    if (y > col.height) {
+      const tree = col.tree ? treeBlockAt(col.tree, x, y, z) : BLOCK.AIR;
+      return tree === BLOCK.AIR && y <= SEA_LEVEL ? BLOCK.WATER : tree;
+    }
     if (this.isCave(x, y, z, col)) return BLOCK.AIR;
     if (col.sand) return y > col.height - SAND.depth ? BLOCK.SAND : BLOCK.STONE;
     if (y === col.height) return BLOCK.GRASS;
-    if (y >= col.height - DIRT_DEPTH) return BLOCK.DIRT;
+    if (y >= col.height - T.dirtDepth) return BLOCK.DIRT;
     return BLOCK.STONE;
   }
 

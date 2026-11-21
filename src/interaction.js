@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCK, isBreakableId, dropId } from './blocks.js';
+import { isBreakableId, isEmptyId, dropId } from './blocks.js';
 import { isPlaceableId, displayName } from './items.js';
 import { THEME } from './theme.js';
 import { bendMaterial, unbendPoint } from './curve.js';
@@ -74,7 +74,8 @@ export class Interaction {
     if (!hit) return;
     const blockId = this.world.getBlock(hit.x, hit.y, hit.z);
     if (!isBreakableId(blockId)) return; // e.g. the core rock floor
-    if (!this.world.setBlock(hit.x, hit.y, hit.z, BLOCK.AIR)) return; // chunk not loaded
+    // The hole is empty air, or water if you dug next to the sea.
+    if (!this.world.setBlock(hit.x, hit.y, hit.z, this.world.emptyAt(hit.x, hit.y, hit.z))) return; // chunk not loaded
     // Collect it. If the inventory is full, the block is simply lost.
     // In creative mode you already have unlimited blocks, so nothing is collected.
     if (!this.inventory.creative) this.inventory.add(dropId(blockId));
@@ -106,7 +107,7 @@ export class Interaction {
     const x = hit.x + hit.nx;
     const y = hit.y + hit.ny;
     const z = hit.z + hit.nz;
-    if (this.world.getBlock(x, y, z) !== BLOCK.AIR) return;
+    if (!isEmptyId(this.world.getBlock(x, y, z))) return; // air or water only
     if (this.player.overlapsBlock(x, y, z)) return; // don't trap yourself
     // Only use one up if the block really went in (and never in creative mode).
     if (this.world.setBlock(x, y, z, blockId) && !this.inventory.creative) {

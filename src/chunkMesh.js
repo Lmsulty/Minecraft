@@ -32,6 +32,13 @@ const MATERIALS = {
   cutout: bendMaterial(new THREE.MeshLambertMaterial({ map: atlas, vertexColors: true, alphaTest: 0.5 })),
   // Glowing blocks: ignore the sun and moon, so they look lit even at night.
   glow: bendMaterial(new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true })),
+  // Water: see-through all over. Drawn after everything solid, so you see the
+  // sea floor through it. depthWrite: false = it never hides other water or
+  // creatures behind it. DoubleSide = you see the surface from underneath too.
+  water: bendMaterial(new THREE.MeshLambertMaterial({
+    map: atlas, vertexColors: true, transparent: true, opacity: THEME.waterOpacity,
+    depthWrite: false, side: THREE.DoubleSide,
+  })),
 };
 
 // ---- Brightness for each light level ----
@@ -198,7 +205,7 @@ class FaceList {
   }
 }
 // One reusable list per render type (see MATERIALS above).
-const LISTS = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceList() };
+const LISTS = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceList(), water: new FaceList() };
 
 // ---- Scratch memory, reused for every chunk ----
 // Building a chunk needs a few big temporary arrays. Making new ones every
@@ -378,8 +385,8 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
           if (blocks[n] === id && !IS_OPAQUE[id]) continue;
           // Tint the face by the light in the air just in front of it.
           const tint = BRIGHTNESS[light[n]];
-          // Glowing blocks are never shaded; everything else gets soft corner shadows.
-          if (!AO_ON || list === lists.glow) {
+          // Glowing blocks and water are never shaded; everything else gets soft corner shadows.
+          if (!AO_ON || list === lists.glow || list === lists.water) {
             list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint);
             continue;
           }

@@ -17,6 +17,8 @@ export const BLOCK = {
   GLOW_LAMP: 10,
   GLASS: 11,
   FELT: 12,
+  // Made by the world on planets with a sea (never carried or placed):
+  WATER: 13,
 };
 
 // Indexed by block id.
@@ -26,10 +28,13 @@ export const BLOCK = {
 // - renderType: 'opaque' = every pixel is solid colour.
 //               'cutout' = some pixels are fully see-through (e.g. gaps between leaves, glass).
 //               'glow'   = always fully bright, even at night (e.g. the glow lamp).
+//               'water'  = see-through all over (how much: THEME.waterOpacity).
 // - blocksLight: does it stop sunlight from spreading into caves? (leaves let light through)
 // - breakable:  can the player break it? (missing = yes)
 // - drops:      which block you collect when you break it (missing = the block itself)
 // - emitsLight: lights up dark places around it, like caves (missing = no)
+// - liquid:     you walk (wade) through it, and it fills holes you dig next to
+//               it below sea level. It can't be carried or placed. (missing = no)
 // - textures:   which tile in the atlas (textures.js) each face uses: top, side, bottom.
 export const BLOCK_TYPES = [
   { id: BLOCK.AIR,   name: 'air',   solid: false, opaque: false, blocksLight: false },
@@ -90,6 +95,13 @@ export const BLOCK_TYPES = [
     id: BLOCK.FELT, name: 'felt block', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
     textures: { top: 'felt', side: 'felt', bottom: 'felt' },
   },
+  {
+    // The sea on the water world. Not solid, so you wade through it and aim
+    // straight through it at the sea floor.
+    id: BLOCK.WATER, name: 'water', solid: false, opaque: false, renderType: 'water', blocksLight: false,
+    liquid: true, breakable: false,
+    textures: { top: 'water', side: 'water', bottom: 'water' },
+  },
 ];
 
 export function isSolidId(id) {
@@ -106,6 +118,12 @@ export function blocksLightId(id) {
 
 export function isBreakableId(id) {
   return BLOCK_TYPES[id]?.breakable ?? true;
+}
+
+// Can a block be put here? True for empty space: air, or water (building in
+// the sea pushes the water out of the way).
+export function isEmptyId(id) {
+  return id === BLOCK.AIR || (BLOCK_TYPES[id]?.liquid ?? false);
 }
 
 // The block you collect when you break block `id`.

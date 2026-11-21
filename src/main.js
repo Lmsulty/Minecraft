@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from './world.js';
 import { SPAWN } from './terrain.js';
-import { BLOCK } from './blocks.js';
+import { BLOCK_TYPES } from './blocks.js';
 import { Player } from './player.js';
 import { Interaction } from './interaction.js';
 import { FpsCounter } from './fps.js';
@@ -10,8 +10,10 @@ import { Hotbar } from './hotbar.js';
 import { Inventory } from './inventory.js';
 import { CreativeToggle } from './creative.js';
 import { InventoryScreen } from './inventoryScreen.js';
-import { applyUiTheme } from './theme.js';
+import { applyUiTheme, THEME, PLANET } from './theme.js';
+import { setupDebugPlanetKey } from './planets.js';
 import { DayNight } from './dayNight.js';
+import { Underwater } from './underwater.js';
 import { updateCurve, cullBentChunks } from './curve.js';
 import { GraphicsSettings } from './graphics.js';
 import { Mobs } from './mobs.js';
@@ -54,7 +56,8 @@ const mainLight = new THREE.DirectionalLight();
 scene.add(ambientLight, mainLight, mainLight.target); // target = the spot the light points at
 
 // ---- Saving: remembers the player's block changes between visits ----
-const SEED = 12345;
+// Each planet has its own seed (theme.js), and so its own terrain and its own save.
+const SEED = PLANET.seed;
 const savedMessage = document.getElementById('saved');
 let hideSavedTimer = null;
 function flashSaved() {
@@ -64,8 +67,8 @@ function flashSaved() {
   hideSavedTimer = setTimeout(() => savedMessage.classList.remove('show'), 1000);
 }
 const editStore = new EditStore(SEED, flashSaved);
-// What the player is carrying. A new world starts with an empty inventory.
-const inventory = new Inventory(SEED, flashSaved);
+// What the player is carrying. The same inventory on every planet.
+const inventory = new Inventory(flashSaved);
 
 // ---- World: chunks load and unload around the player as they move ----
 const world = new World(SEED, editStore);
@@ -77,28 +80,37 @@ const player = new Player(camera, world, renderer.domElement, document.getElemen
 
 // ---- Day/night cycle (press T to speed it up) ----
 const dayNight = new DayNight(scene, camera, ambientLight, mainLight, graphics.level);
+// Sea-coloured view with your head under water (underwater.js).
+const underwater = new Underwater(scene, camera, world, ambientLight, () => graphics.level.haze);
 
-// Spawn near the middle of chunk (0, 0). Build the ground around it right away
-// so there's something to stand on; the rest streams in over the next second.
-world.loadAroundNow(SPAWN.x + 0.5, SPAWN.z + 0.5);
-const spawn = findSpawn(SPAWN.x, SPAWN.z);
+// Spawn near the middle of chunk (0, 0), or on the nearest island if that's
+// sea. Build the ground around it right away so there's something to stand
+// on; the rest streams in over the next second.
+const land = world.terrain.findLand(SPAWN.x, SPAWN.z);
+world.loadAroundNow(land.x + 0.5, land.z + 0.5);
+const spawn = findSpawn(land.x, land.z);
 player.spawn(spawn.x, spawn.y, spawn.z);
-// Start looking at the starter sinkhole, so a new player sees a cave straight away.
+// Start looking at the starter sinkhole, so a new player sees a cave straight
+// away. (Planets with no caves don't have one.)
 const starter = world.terrain.starter;
-const toStarter = Math.hypot(starter.x - spawn.x, starter.z - spawn.z);
-player.yaw = Math.atan2(-(starter.x - spawn.x), -(starter.z - spawn.z));
-player.pitch = -Math.atan2(spawn.y + 1.62 - starter.top, toStarter); // aim at the middle of the hole
+if (starter) {
+  const toStarter = Math.hypot(starter.x - spawn.x, starter.z - spawn.z);
+  player.yaw = Math.atan2(-(starter.x - spawn.x), -(starter.z - spawn.z));
+  player.pitch = -Math.atan2(spawn.y + 1.62 - starter.top, toStarter); // aim at the middle of the hole
+}
 player.updateCamera();
 
-// Find a safe spot to stand: untouched grass with two blocks of air above
-// (not inside a cave opening). Searches in growing squares around (x, z).
+// Find a safe spot to stand: untouched ground (grass at home, see
+// terrain.spawnOn in theme.js) with two blocks of air above (not inside a
+// cave opening). Searches in growing squares around (x, z).
 function findSpawn(x, z) {
+  const ground = BLOCK_TYPES.findIndex((type) => type.name === THEME.terrain.spawnOn);
   for (let r = 0; r <= 12; r++) {
     for (let dx = -r; dx <= r; dx++) {
       for (let dz = -r; dz <= r; dz++) {
         if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; // only the ring's edge
         const h = world.terrain.height(x + dx, z + dz);
-        if (world.getBlock(x + dx, h, z + dz) === BLOCK.GRASS &&
+        if (world.getBlock(x + dx, h, z + dz) === ground &&
             !world.isSolid(x + dx, h + 1, z + dz) &&
             !world.isSolid(x + dx, h + 2, z + dz)) {
           return { x: x + dx + 0.5, y: h + 1, z: z + dz + 0.5 };
@@ -164,6 +176,9 @@ graphics.attach({
   notice: document.getElementById('notice'),
 });
 
+// ---- Debug: press P to jump to the next planet (switch off in planets.js) ----
+setupDebugPlanetKey();
+
 // ---- "Reset world" button on the pause screen ----
 document.getElementById('reset').addEventListener('click', (e) => {
   e.stopPropagation(); // don't also count as "click to play"
@@ -198,6 +213,7 @@ function loop(now) {
   kevinTalk.update(dt); // after Kevin moves, so his speech bubble follows him
   interaction.update();
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera
+  underwater.update();  // after dayNight, which sets the haze colour every frame
   updateCurve(camera);                   // the cylinder bend starts at the camera
   cullBentChunks(world.group, camera);   // skip chunks that are off-screen (after bending)
   renderer.render(scene, camera);

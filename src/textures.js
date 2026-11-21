@@ -374,6 +374,28 @@ function paintFelt(t, rand) {
 // ---- Atlas layout ----
 // Order here = position in the atlas (left to right, then next row).
 // Names must match the `textures` entries in blocks.js.
+function paintWater(t, rand) {
+  // Teal water with soft darker patches and a few light wavy ripple lines.
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, C.water.base));
+  }
+  for (let i = 0; i < 6; i++) {
+    const x = Math.floor(rand() * TILE);
+    const y = Math.floor(rand() * TILE);
+    t.set(x, y, C.water.deep);
+    t.set(x + 1, y, C.water.deep);
+  }
+  // Ripples: short wavy lines that wrap around the edges, so the sea has no seams.
+  for (const row of [3, 8, 13]) {
+    let y = row;
+    const start = Math.floor(rand() * TILE);
+    for (let k = 0; k < 7; k++) {
+      if (rand() < 0.35) y += rand() < 0.5 ? -1 : 1;
+      t.set(start + k, y, C.water.ripple);
+    }
+  }
+}
+
 const PAINTERS = {
   grass_top: paintGrassTop,
   grass_side: paintGrassSide,
@@ -390,6 +412,7 @@ const PAINTERS = {
   glow_lamp: paintGlowLamp,
   glass: paintGlass,
   felt: paintFelt,
+  water: paintWater,
 };
 const TILE_NAMES = Object.keys(PAINTERS);
 

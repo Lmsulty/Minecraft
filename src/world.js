@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { BLOCK, isSolidId } from './blocks.js';
+import { THEME } from './theme.js';
 import { Terrain } from './terrain.js';
 import { buildChunkMesh, disposeChunkMesh, LIGHT_SPREAD } from './chunkMesh.js';
 
@@ -116,6 +117,19 @@ export class World {
 
   isSolid(x, y, z) {
     return isSolidId(this.getBlock(x, y, z));
+  }
+
+  // What fills the space when the block at (x, y, z) is dug out: water if it's
+  // at or below sea level and touches water (beside it or above it), else air.
+  // So digging into the sea floor makes a hole that fills with sea, but
+  // digging on an island stays dry.
+  emptyAt(x, y, z) {
+    const seaLevel = THEME.terrain.seaLevel;
+    if (!seaLevel || y > seaLevel) return BLOCK.AIR;
+    for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]]) {
+      if (this.getBlock(x + dx, y + dy, z + dz) === BLOCK.WATER) return BLOCK.WATER;
+    }
+    return BLOCK.AIR;
   }
 
   // Is the block at (x, y, z) still exactly what the world made there

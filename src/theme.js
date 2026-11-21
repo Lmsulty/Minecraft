@@ -7,8 +7,118 @@
 // ==========================================================
 
 export const THEME = {
-  // Which planet you're on. Picks per-planet settings, e.g. blackHole.perPlanet.
+  // Which planet you're on. Set automatically when the game starts (from the
+  // save, see the bottom of this file), so don't change it here.
   planet: 'home',
+
+  // ---- Planets ----
+  // Every planet orbits the same black hole. Each one is its own endless world
+  // with its own seed (so its own terrain and its own save).
+  //   name:    shown on screen
+  //   seed:    the number its terrain grows from. Changing it gives a brand new
+  //            world (and the old save for that planet no longer lines up).
+  //   changes: settings that are DIFFERENT from home. Anything you put here
+  //            replaces the same setting further down this file, only on that
+  //            planet. Anything you leave out stays the same as home.
+  //            Example: trees: { chance: 0 } = no trees, same tree shape.
+  // Home has no changes, so home is exactly the game as it was before planets.
+  planets: {
+    home: {
+      name: 'Home',
+      seed: 12345,
+      changes: {},
+    },
+    water: {
+      name: 'Water world',
+      seed: 777,
+      changes: {
+        // Low ground under a shallow sea, with sandy islands poking out.
+        terrain: {
+          baseHeight: 40,
+          hillHeight: 9,
+          seaLevel: 43,
+          maxSeaDepth: 3,
+          caves: false,
+          spawnOn: 'sand',
+          sand: { maxHeight: 96, threshold: -99, depth: 4 }, // sand everywhere
+        },
+        trees: { chance: 0 },
+
+        // Bright aqua sky. Same hours as home's keyframes (see skyKeyframes below).
+        skyKeyframes: [
+          { hour: 4,  name: 'night',   sky: '#0c1e26', skyTop: '#030a10', light: '#8fc4d8', lightStrength: 0.45, ambientSky: '#2e5a6a', ambientGround: '#10181a', ambientStrength: 0.5,  cloudLit: '#24404a', cloudShade: '#0e1c22', stars: 1 },
+          { hour: 5,  name: 'dawn',    sky: '#4e6e7a', skyTop: '#1c3448', light: '#b0c8d0', lightStrength: 0.5,  ambientSky: '#6a8a9a', ambientGround: '#22282a', ambientStrength: 0.55, cloudLit: '#a8c0c4', cloudShade: '#3a5060', stars: 0.5 },
+          { hour: 6,  name: 'sunrise', sky: '#f2c8a0', skyTop: '#5aa0b8', light: '#ffd8a8', lightStrength: 1.0,  ambientSky: '#ffe2c4', ambientGround: '#6a6650', ambientStrength: 0.85, cloudLit: '#ffe0b0', cloudShade: '#d8a0a0', stars: 0 },
+          { hour: 8,  name: 'day',     sky: '#bfe8e4', skyTop: '#3fb0c8', light: '#fffaf0', lightStrength: 1.9,  ambientSky: '#ffffff', ambientGround: '#8a8a70', ambientStrength: 1.25, cloudLit: '#ffffff', cloudShade: '#b8d4d8', stars: 0 },
+          { hour: 18, name: 'day',     sky: '#bfe8e4', skyTop: '#3fb0c8', light: '#fffaf0', lightStrength: 1.9,  ambientSky: '#ffffff', ambientGround: '#8a8a70', ambientStrength: 1.25, cloudLit: '#ffffff', cloudShade: '#b8d4d8', stars: 0 },
+          { hour: 19.5, name: 'sunset', sky: '#f0a878', skyTop: '#3a7a9a', light: '#ffaa66', lightStrength: 1.0, ambientSky: '#ffcca0', ambientGround: '#5a4a3a', ambientStrength: 0.8,  cloudLit: '#ffc880', cloudShade: '#c87890', stars: 0 },
+          { hour: 21, name: 'dusk',    sky: '#2e4a5e', skyTop: '#0e1e30', light: '#8ab0c8', lightStrength: 0.45, ambientSky: '#4a6a80', ambientGround: '#161c20', ambientStrength: 0.5,  cloudLit: '#5a7890', cloudShade: '#1e2c3a', stars: 0.6 },
+          { hour: 22, name: 'night',   sky: '#0c1e26', skyTop: '#030a10', light: '#8fc4d8', lightStrength: 0.45, ambientSky: '#2e5a6a', ambientGround: '#10181a', ambientStrength: 0.5,  cloudLit: '#24404a', cloudShade: '#0e1c22', stars: 1 },
+        ],
+        clouds: { coverage: 0.3 }, // fewer clouds, so the black hole and ringed planet show
+
+        // A big ringed planet, low in the south-east sky (see skyPlanets below).
+        skyPlanets: [
+          {
+            direction: 150,  // compass degrees: 0 = north (where the black hole is), 90 = east, 180 = south
+            height: 24,      // degrees above the horizon
+            size: 8,         // degrees across the ball (the ring reaches about twice as far)
+            bands: ['#e3c49a', '#d2a77c', '#ecd6b2', '#c8966c'], // stripes, repeating from pole to pole
+            nightSide: '#141522',  // the side facing away from the sun
+            atmosphere: '#cfeaff', // the thin glow around its edge
+            ring: '#efe6d2',       // the ring
+            ringDark: '#a99c86',   // the ring's inner edge
+            ringTilt: -18,         // degrees the ring is tipped
+            ringOpen: 0.28,        // how open the ring looks (0 = edge-on line, 1 = a full circle)
+            dayHaze: 0.4,          // how much of the sky's light shows in it by day (0 = none, 1 = its dark side vanishes)...
+            nightHaze: 0.06,       // ...and at night
+            // It's lit by the big sun, wherever that is, so the lit side moves through the day.
+          },
+        ],
+
+        textures: {
+          sand: {          // pale, almost white sand
+            base: ['#f4eedc', '#ede5cf', '#f8f3e6'],
+            ripple: '#ddd2b6',
+            speckDark: '#cbbf9f',
+            speckLight: '#ffffff',
+          },
+        },
+        blackHole: { size: 8, brightness: 1.6, glowAmount: 0.15 }, // the closest planet: it fills a big part of the sky
+
+        ui: { '--page-bg': '#bfe8e4' },
+      },
+    },
+  },
+
+  // ---- Terrain shape (logic in terrain.js) ----
+  // These are home's settings. Other planets change some of them (see planets above).
+  terrain: {
+    baseHeight: 48,   // average ground level (world is 96 tall)
+    hillHeight: 8,    // how far hills rise/fall from the average
+    dirtDepth: 3,     // dirt layers under the grass
+    caves: true,      // false = no tunnels, caverns, sinkholes or hillside entrances
+    spawnOn: 'grass', // block name (blocks.js) you start the game standing on
+
+    // Sea: every gap between the ground and this height is filled with water.
+    // 0 = no sea at all.
+    seaLevel: 0,
+    // How deep the sea gets, in blocks. Deeper ground is raised up to this,
+    // so the sea stays shallow. The sea gets deeper slowly away from the shore:
+    // about 1 block deeper for every 4 blocks the ground would have dropped.
+    maxSeaDepth: 3,
+
+    // Sand: patches of sand form in low-lying ground (hollows and valleys),
+    // like dried-up ponds. A column is sand if it's low enough AND its "sand
+    // noise" (a seeded pattern of blobs) plus a bonus for being extra low is high enough.
+    sand: {
+      maxHeight: 45,      // ground must be at or below this height
+      patchScale: 0.06,   // smaller = bigger, smoother patches
+      threshold: 0.15,    // -1 to 1. Bigger = fewer, smaller patches; -1 = every low spot
+      lowlandBonus: 0.12, // each block lower than maxHeight makes sand this much more likely
+      depth: 3,           // sand layers, counting the top one. Stone underneath.
+    },
+  },
 
   // ---- Sky, haze and light through the day ----
   // The game clock runs 0:00 -> 24:00 (one full day takes about 6 real minutes).
@@ -104,6 +214,10 @@ export const THEME = {
   },
 
   // ---- Things in the sky (drawn in sky.js) ----
+  // Other planets hanging in the sky. Home has none; each planet can list its
+  // own in THEME.planets (see the water world for every setting).
+  skyPlanets: [],
+
   // The two suns rise and set together. The first one is the big one that
   // lights the world; the second trails a little behind on a slightly
   // different path, so it sets a moment later.
@@ -154,14 +268,15 @@ export const THEME = {
     dayDarkColor: '#1e0e16',   // the colour that patch of sky darkens towards
     bendStrength: 5,           // how strongly it bends the light of stars behind it
 
-    // How it looks from each planet. The closer the planet, the bigger it looks.
-    //   size:       radius of the hole, in degrees of sky. The whirlpool
-    //               reaches swirlSize times further, the glow further still.
-    //   brightness: 1 = normal, higher = more blazing
-    // Later planets get their own line here, e.g. waterWorld: { size: 12, brightness: 1.6 }.
-    perPlanet: {
-      home: { size: 2.6, brightness: 1 }, // the farthest planet: smallest view (about 23 degrees across)
-    },
+    // How it looks from home, the farthest planet: the smallest view (about
+    // 23 degrees across). Closer planets change these in THEME.planets, so
+    // it looks bigger there.
+    size: 2.6,                 // radius of the hole, in degrees of sky. The whirlpool
+                               // reaches swirlSize times further, the glow further still.
+    brightness: 1,             // 1 = normal, higher = more blazing
+    glowAmount: 1,             // how strongly its glow tints the sky around it (0 = none).
+                               // The glow grows with `size`: turn this down when the
+                               // black hole looks huge, or the whole night sky goes red.
   },
   // Night sky (drawn into the sky in sky.js). Stars fade in through dusk.
   starfield: {
@@ -183,7 +298,7 @@ export const THEME = {
     curveRamp: 0,         // blocks over which the curve grows from nothing to full strength
     curveRadius: 75,      // how tight the full-strength curve is (smaller = more dramatic)
     curveGroundLevel: 48, // the height that sits exactly on the curved ground line
-                          // (average ground level, see BASE_HEIGHT in terrain.js)
+                          // (average ground level, see terrain.baseHeight above)
   },
 
   // ---- Creatures (shapes and behaviour in mobTypes.js, logic in mobs.js) ----
@@ -257,6 +372,13 @@ export const THEME = {
   // colour (no light at all) up to full brightness (open sky). An alien theme
   // could make this a faint glow, e.g. '#183020'.
   caveLight: '#2e2a30',
+
+  // How see-through water is (0 = invisible, 1 = solid colour).
+  waterOpacity: 0.7,
+
+  // With your head under water, the view turns this colour and fades out
+  // after `distance` blocks. It gets darker at night along with the light.
+  underwater: { color: '#1d8f88', distance: 14 },
 
   // Ambient occlusion: corners and edges where blocks meet get slightly
   // darker, like real soft shadows. 0 = off, 0.5 = strong.
@@ -372,6 +494,12 @@ export const THEME = {
       seamShade: '#62290f', // bottom and right edges
       stitch: '#ecc596',    // the ring of pale stitches
     },
+    // ---- Water (only on planets with a sea) ----
+    water: {               // shallow teal sea with soft ripples (how see-through: waterOpacity)
+      base: ['#2fb3a6', '#33bbad', '#2aa99d', '#36c0b2'],
+      ripple: '#6fe0d2',   // lighter wavy lines
+      deep: '#23978c',     // darker patches between ripples
+    },
   },
 
   // ---- Interface (pause screen, FPS box, hotbar...) ----
@@ -445,6 +573,41 @@ export const THEME = {
     '--kevin-pick-text': '#ffffff',
   },
 };
+
+// ---- Which planet are we on? ----
+// The planet is remembered in the browser. Travelling saves the new planet
+// and reloads the page (see planets.js), and the game starts up as that planet.
+// This runs before any other file reads THEME, so every file sees the
+// planet's settings without needing to know about planets.
+export const PLANET_SAVE_KEY = 'voxelgame.planet';
+
+function loadPlanetName() {
+  try {
+    const saved = localStorage.getItem(PLANET_SAVE_KEY);
+    if (saved && THEME.planets[saved]) return saved;
+  } catch (err) {
+    console.warn('Could not load which planet you were on:', err);
+  }
+  return 'home';
+}
+
+// Copy every setting in `changes` over the same setting in `target`.
+// Groups of settings ({ ... }) are merged one setting at a time, so a planet
+// can change one number without repeating the rest. Lists ([ ... ]) and single
+// values are replaced whole.
+function applyChanges(target, changes) {
+  for (const [key, value] of Object.entries(changes)) {
+    const isGroup = value && typeof value === 'object' && !Array.isArray(value);
+    if (isGroup && target[key] && typeof target[key] === 'object') applyChanges(target[key], value);
+    else target[key] = value;
+  }
+}
+
+THEME.planet = loadPlanetName();
+applyChanges(THEME, THEME.planets[THEME.planet].changes);
+
+// The settings of the planet you're on (name, seed...).
+export const PLANET = THEME.planets[THEME.planet];
 
 // Turn the interface colours into CSS variables. Call once at startup.
 export function applyUiTheme() {

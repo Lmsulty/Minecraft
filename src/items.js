@@ -40,9 +40,10 @@ export function itemType(id) {
   return ITEMS_BY_ID.get(id);
 }
 
-// Can it be put down in the world? (Blocks with a look can; items can't.)
+// Can it be put down in the world? (Blocks with a look can; items can't,
+// and neither can water.)
 export function isPlaceableId(id) {
-  return !!BLOCK_TYPES[id]?.textures;
+  return !!BLOCK_TYPES[id]?.textures && !BLOCK_TYPES[id].liquid;
 }
 
 // Can it sit in the inventory? (Any real block or item. Used when loading a

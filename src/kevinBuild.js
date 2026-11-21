@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCK, isBreakableId, dropId } from './blocks.js';
+import { BLOCK, isBreakableId, isEmptyId, dropId } from './blocks.js';
 import { isPlaceableId, displayName } from './items.js';
 import { THEME } from './theme.js';
 import { bendMaterial } from './curve.js';
@@ -193,7 +193,7 @@ export class KevinBuilder {
     // Only spots that are empty (or will be, once he's cleared them): he never replaces anything.
     const cleared = new Set(clear.map((c) => `${c.x},${c.y},${c.z}`));
     blocks = blocks.filter((b) =>
-      this.world.getBlock(b.x, b.y, b.z) === BLOCK.AIR || cleared.has(`${b.x},${b.y},${b.z}`));
+      isEmptyId(this.world.getBlock(b.x, b.y, b.z)) || cleared.has(`${b.x},${b.y},${b.z}`));
     if (blocks.length === 0) return refuse('noRoom');
 
     // Survival: enough of each block?
@@ -288,7 +288,7 @@ export class KevinBuilder {
     // Place the next block that can still go in.
     while (job.next < job.blocks.length) {
       const b = job.blocks[job.next++];
-      if (this.world.getBlock(b.x, b.y, b.z) !== BLOCK.AIR) continue; // something's there now: leave it be
+      if (!isEmptyId(this.world.getBlock(b.x, b.y, b.z))) continue; // something's there now: leave it be
       if (this.player.overlapsBlock(b.x, b.y, b.z)) continue;         // you're standing there
       if (this.kevin.overlapsBlock(b.x, b.y, b.z)) this.kevin.teleport({ quiet: true });
       if (!this.inventory.creative && this.inventory.countOf(b.id) < 1) {
@@ -315,7 +315,7 @@ export class KevinBuilder {
       const id = this.world.getBlock(c.x, c.y, c.z);
       // Check again: still the same natural block? (You might have changed it since.)
       if (id !== c.id || !this.world.isNatural(c.x, c.y, c.z) || !isBreakableId(id)) continue;
-      if (!this.world.setBlock(c.x, c.y, c.z, BLOCK.AIR)) continue; // ground not loaded
+      if (!this.world.setBlock(c.x, c.y, c.z, this.world.emptyAt(c.x, c.y, c.z))) continue; // ground not loaded
       if (!this.inventory.creative) this.inventory.add(dropId(id)); // like mining it yourself
       job.changed++;
       this.kevin.workAt(c);

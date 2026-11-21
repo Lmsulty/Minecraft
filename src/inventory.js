@@ -1,4 +1,5 @@
 import { isCarryableId } from './items.js';
+import { THEME } from './theme.js';
 
 // Everything the player is carrying. This file only holds the DATA
 // (which block is in which slot, and how many). Drawing it on screen is
@@ -13,6 +14,7 @@ import { isCarryableId } from './items.js';
 // around on the inventory screen (null = nothing held).
 //
 // Saved to localStorage, like world edits, so it survives a refresh.
+// There's ONE inventory for every planet: you carry it with you when you travel.
 
 export const HOTBAR_SIZE = 9;
 export const INVENTORY_SIZE = 36; // 9 hotbar + 27 backpack
@@ -22,9 +24,9 @@ const SAVE_DELAY_MS = 1000; // save this long after the last change, not on ever
 
 export class Inventory {
   // onSaved: called after each successful save (for the "Saved" message)
-  constructor(seed, onSaved) {
-    // One inventory per world (seed), like the world edits.
-    this.storageKey = `voxelgame.inventory.seed${seed}.v1`;
+  constructor(onSaved) {
+    // The same save on every planet (not tied to a planet's seed, like world edits are).
+    this.storageKey = 'voxelgame.inventory.shared.v1';
     this.onSaved = onSaved;
     this.slots = new Array(INVENTORY_SIZE).fill(null);
     this.held = null;        // stack on the mouse pointer (inventory screen only)
@@ -281,7 +283,24 @@ export class Inventory {
 
   // ---- Saving and loading ----
 
+  // Before planets, the inventory was saved under home's seed. The first time
+  // the game runs with planets, move that save over to the shared one, so
+  // nothing is lost. (It's moved, not copied, so "Reset world" can't bring it back.)
+  moveOldSave() {
+    const oldKey = `voxelgame.inventory.seed${THEME.planets.home.seed}.v1`;
+    try {
+      if (localStorage.getItem(this.storageKey) !== null) return; // already moved
+      const old = localStorage.getItem(oldKey);
+      if (old === null) return; // nothing to move
+      localStorage.setItem(this.storageKey, old);
+      localStorage.removeItem(oldKey); // only after the copy worked
+    } catch (err) {
+      console.warn('Could not move the old inventory save:', err);
+    }
+  }
+
   load() {
+    this.moveOldSave();
     let saved = null;
     try {
       saved = JSON.parse(localStorage.getItem(this.storageKey));

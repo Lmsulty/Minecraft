@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { THEME } from './theme.js';
-import { makeSkyDome, makeSuns, setSkyDetail } from './sky.js';
+import { makeSkyDome, makeSuns, makeSkyPlanets, setSkyDetail } from './sky.js';
 
 // Day/night cycle: a game clock, the two suns moving across the sky, the
 // black hole with the stars wheeling around it at night, and the sky, haze
@@ -55,7 +55,10 @@ export class DayNight {
     // The sky dome draws the sky colours, the stars and the black hole (sky.js).
     this.dome = makeSkyDome(skyDetail);
     this.suns = makeSuns();
-    scene.add(this.dome, ...this.suns);
+    // Other planets in the sky (none from home). They stay still, like the black hole.
+    // They're lit by the big sun and tinted by the sky colour, both shared with the dome.
+    this.skyPlanets = makeSkyPlanets(this.dome, SKY_DISTANCE);
+    scene.add(this.dome, ...this.suns, ...this.skyPlanets.map((p) => p.mesh));
 
     // The black hole stays still, high in the northern sky (north = -z).
     // Also work out "up" and "right" across it, for drawing its disc.
@@ -164,6 +167,11 @@ export class DayNight {
     dome.sunDirection.value.copy(this.sunDirection);
     dome.sunGlow.value.copy(this.mainLight.color);
     dome.sunGlowStrength.value = smooth((sunHeight + 0.25) / 0.25) * (1 - 0.6 * smooth(sunHeight / 0.5));
+
+    // Other planets: always the same distance from you.
+    for (const { mesh, direction } of this.skyPlanets) {
+      mesh.position.copy(cam).addScaledVector(direction, SKY_DISTANCE);
+    }
 
     // The dome follows you; the stars turn slowly around the black hole.
     this.dome.position.copy(cam);

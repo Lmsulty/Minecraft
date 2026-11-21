@@ -7,6 +7,8 @@ import { makeRandom } from './random.js';
 //    the big sun, the stars and galaxy band, and the black hole (a fiery
 //    whirlpool being sucked into a hole, with the stars bent around it)
 //  - the two suns (small pixel-art pictures)
+//  - other planets hanging in the sky, like the ringed planet seen from the
+//    water world (smooth, lit by the real sun)
 // dayNight.js moves things and sets their colours through the day.
 
 export const SKY_DOME_RADIUS = 400; // must stay inside the camera's view distance (500)
@@ -79,9 +81,6 @@ function makeCloudMap() {
   return texture;
 }
 
-const holeView = BH.perPlanet[THEME.planet];
-if (!holeView) throw new Error(`theme.js: no blackHole.perPlanet entry for planet "${THEME.planet}"`);
-
 // Write a JS number into shader code (shaders need a decimal point).
 const f = (n) => n.toFixed(4);
 
@@ -110,8 +109,8 @@ export function makeSkyDome(detail) {
       holeDirection: { value: new THREE.Vector3(0, 1, 0) },
       holeRight: { value: new THREE.Vector3(1, 0, 0) },
       holeUp: { value: new THREE.Vector3(0, 0, -1) },
-      holeSize: { value: THREE.MathUtils.degToRad(holeView.size) },
-      holeBrightness: { value: holeView.brightness },
+      holeSize: { value: THREE.MathUtils.degToRad(BH.size) },
+      holeBrightness: { value: BH.brightness },
       holeShadow: { value: new THREE.Color(BH.shadow) },
       gasOuter: { value: new THREE.Color(BH.gasOuter) },
       gasMiddle: { value: new THREE.Color(BH.gasMiddle) },
@@ -279,6 +278,12 @@ function skyFragmentShader(detail) {
         vec2 q = vec2(dot(direction, holeRight), dot(direction, holeUp)) / holeSize;
         float r = length(q);
         bool nearHole = facing > 0.0 && r < ${f(LENS_REACH + 4.0)};
+        // Everything the black hole does to the sky around it (glow, darkening,
+        // bending) fades out smoothly before 90 degrees away from it. Without
+        // this, a big black hole (seen from a close planet) would still be
+        // glowing there, and stop at a hard straight line across the sky.
+        // From home it's small, so its effects have already faded long before this.
+        float edgeFade = smoothstep(0.0, 0.5, facing);
 
         // ---- Bent light ----
         // Light passing close to the black hole is bent, so the sky we see
@@ -286,7 +291,7 @@ function skyFragmentShader(detail) {
         // smeared into arcs around it. The bend fades away with distance.
         vec3 skyDirection = direction;
         if (nearHole) {
-          float fade = 1.0 - smoothstep(${f(LENS_REACH * 0.5)}, ${f(LENS_REACH)}, r);
+          float fade = (1.0 - smoothstep(${f(LENS_REACH * 0.5)}, ${f(LENS_REACH)}, r)) * edgeFade;
           vec2 source = q * (1.0 - ${f(BH.bendStrength)} / max(r * r, 0.0001));
           source = mix(q, source, fade);
           skyDirection = normalize(holeDirection * facing + (holeRight * source.x + holeUp * source.y) * holeSize);
@@ -335,7 +340,7 @@ function skyFragmentShader(detail) {
           vec3 cloudDirection = skyDirection;
           float pulled = 0.0;
           if (nearHole) {
-            pulled = exp(-r / ${f(SWIRL * 0.8)}) * ${f(CL.blackHolePull)};
+            pulled = exp(-r / ${f(SWIRL * 0.8)}) * ${f(CL.blackHolePull)} * edgeFade;
             cloudDirection = turnAround(cloudDirection, holeDirection, pulled * 2.5);
           }
           vec2 layer = cloudDirection.xz / (cloudDirection.y + 0.12);
@@ -369,12 +374,14 @@ function skyFragmentShader(detail) {
           float power = holeBrightness * (1.0 + ${f(BH.nightBoost)} * starsVisible);
 
           // By day, the sky around it darkens, as if it's swallowing the daylight.
-          float dusk = exp(-pow(r / ${f(SWIRL * 1.25)}, 2.0)) * ${f(BH.dayDarkening)} * (1.0 - starsVisible);
+          float dusk = exp(-pow(r / ${f(SWIRL * 1.25)}, 2.0)) * ${f(BH.dayDarkening)} * (1.0 - starsVisible) * edgeFade;
           color = mix(color, dayDarkColor, dusk);
 
           // Soft glow spreading into the sky (fades to nothing before the edge of this area).
+          // How strong it is: glowAmount in theme.js.
           float glow = (0.40 * exp(-(r - 1.0) / 1.8) + 0.10 * exp(-r / 4.0))
-                     * (1.0 - smoothstep(${f(LENS_REACH * 0.6)}, ${f(LENS_REACH + 3.0)}, r));
+                     * (1.0 - smoothstep(${f(LENS_REACH * 0.6)}, ${f(LENS_REACH + 3.0)}, r))
+                     * ${f(BH.glowAmount)} * edgeFade;
           color += holeGlow * glow * power * mix(0.6, 1.0, starsVisible);
 
           // ---- The whirlpool, seen from above at an angle ----
@@ -479,4 +486,205 @@ function makeSkySprite(draw, size) {
 
 export function makeSuns() {
   return THEME.suns.map((sun) => makeSkySprite(sunPainter(sun), sun.size));
+}
+
+// ---- Other planets in the sky ----
+// Each one is a smooth striped ball with a ring around it, drawn on a flat
+// square that always faces you. The pixel program works out, for every pixel:
+//   - the ball, lit from where the big sun really is (so the lit side moves
+//     through the day, and it's a crescent when the sun is behind it)
+//   - the ring, which passes in front of the ball on the near side and behind
+//     it on the far side. The ball's shadow falls on the ring, and the ring's
+//     shadow falls on the ball.
+//   - a thin soft glow of atmosphere around its edge
+//   - a bit of the sky's colour mixed in (more by day), so it sits in the sky
+//     instead of looking stuck on top of it
+// The ball is solid, so stars never show through it.
+// Settings: THEME.skyPlanets (each planet lists its own in THEME.planets).
+const RING_INNER = 1.35;      // the ring, in ball radii from the middle
+const RING_GAP = 1.72;        // a thin dark gap in the ring
+const RING_OUTER = 2.1;
+const PLANET_EXTENT = 2.25;   // the square reaches this far out (in ball radii): room for ring and glow
+const ATMOSPHERE_WIDTH = 0.05; // how far the soft glow spreads past the edge (in ball radii)
+
+function skyPlanetShader(p) {
+  const bandCount = p.bands.length;
+  return /* glsl */ `
+    uniform vec3 sunDirection;  // shared with the sky dome
+    uniform vec3 horizon;
+    uniform vec3 top;
+    uniform float starsVisible;
+    uniform vec3 planetDirection; // which way it is from you
+    uniform vec3 across;          // "right" across the square, in the world
+    uniform vec3 upward;          // "up" across the square
+    uniform vec3 toward;          // from the planet towards you
+    uniform vec3 ringNormal;      // straight out of the ring's flat side
+    uniform vec3 bands[${bandCount}];
+    uniform vec3 nightSide;
+    uniform vec3 atmosphere;
+    uniform vec3 ringColor;
+    uniform vec3 ringDark;
+    varying vec2 vUv;
+
+    // Stack a see-through layer on top of what's there (colours pre-multiplied by alpha).
+    vec4 over(vec4 below, vec3 color, float alpha) {
+      return vec4(color * alpha + below.rgb * (1.0 - alpha), alpha + below.a * (1.0 - alpha));
+    }
+
+    // Stripe colour at a latitude (-1 = one pole, 1 = the other), a little wavy.
+    vec3 bandColor(float latitude, float wave) {
+      float t = (latitude * 0.5 + 0.5) * 9.0 + wave;
+      float i = floor(t);
+      float blend = smoothstep(0.3, 0.7, fract(t)); // soft edges between stripes
+      int a = int(mod(i, ${bandCount}.0));
+      int b = int(mod(i + 1.0, ${bandCount}.0));
+      vec3 colorA = bands[0];
+      vec3 colorB = bands[0];
+      for (int k = 0; k < ${bandCount}; k++) {
+        if (k == a) colorA = bands[k];
+        if (k == b) colorB = bands[k];
+      }
+      return mix(colorA, colorB, blend);
+    }
+
+    // The ring's brightness and see-through-ness at distance d from the middle.
+    float ringCover(float d, float soft) {
+      float inside = smoothstep(${f(RING_INNER)} - soft, ${f(RING_INNER)} + soft, d)
+                   * (1.0 - smoothstep(${f(RING_OUTER)} - soft, ${f(RING_OUTER)} + soft, d));
+      float gap = 1.0 - 0.85 * (1.0 - smoothstep(0.015, 0.035 + soft, abs(d - ${f(RING_GAP)})));
+      float grooves = 0.8 + 0.2 * sin(d * 60.0) * sin(d * 17.0); // fine lines around it
+      return inside * gap * grooves * 0.92;
+    }
+
+    void main() {
+      vec2 p = (vUv * 2.0 - 1.0) * ${f(PLANET_EXTENT)}; // position on the square, in ball radii
+      float r = length(p);
+      float soft = fwidth(r) * 1.5; // about one pixel: smooth edges at any size
+      vec3 sun = normalize(sunDirection);
+      float onBall = 1.0 - smoothstep(1.0 - soft, 1.0, r);
+      float front = sqrt(max(0.0, 1.0 - r * r)); // how far the ball's surface bulges towards you here
+      vec4 color = vec4(0.0);
+
+      // ---- Atmosphere glow just outside the edge, brighter on the sunny side ----
+      if (r > 1.0) {
+        vec3 edgeOut = normalize(p.x * across + p.y * upward);
+        float sunny = 0.25 + 0.75 * smoothstep(-0.4, 0.5, dot(edgeOut, sun));
+        color = over(color, atmosphere, exp(-(r - 1.0) / ${f(ATMOSPHERE_WIDTH)}) * 0.75 * sunny);
+      }
+
+      // ---- The ring: where does the line of sight cross its flat plane? ----
+      float t = -(p.x * dot(across, ringNormal) + p.y * dot(upward, ringNormal)) / dot(toward, ringNormal);
+      vec3 ringPoint = p.x * across + p.y * upward + t * toward;
+      float ringD = length(ringPoint);
+      float ringA = ringCover(ringD, fwidth(ringD) * 1.5);
+      vec3 ringC = mix(ringDark, ringColor, smoothstep(${f(RING_INNER)}, ${f(RING_INNER + 0.3)}, ringD));
+      // Lit best when the sun shines on its flat side; dark in the ball's shadow.
+      ringC *= 0.35 + 0.65 * abs(dot(sun, ringNormal));
+      float towardSun = dot(ringPoint, sun);
+      float fromSunLine = length(ringPoint - towardSun * sun);
+      if (towardSun < 0.0) ringC *= mix(0.12, 1.0, smoothstep(0.95, 1.05, fromSunLine));
+      bool ringInFront = t > front;
+
+      // Far side of the ring first (the ball covers it)...
+      if (!ringInFront) color = over(color, ringC, ringA);
+
+      // ---- The ball ----
+      if (onBall > 0.0) {
+        vec3 normal = normalize(p.x * across + p.y * upward + front * toward);
+        float latitude = dot(normal, ringNormal);
+        float wave = 0.25 * sin(dot(normal, across) * 7.0 + latitude * 3.0);
+        vec3 base = bandColor(latitude, wave);
+        float light = dot(normal, sun);
+        float lit = smoothstep(-0.06, 0.2, light);       // soft line between day and night
+        vec3 ball = mix(nightSide, base * (0.45 + 0.6 * max(light, 0.0)), lit);
+        // The ring's shadow on the ball.
+        float k = -dot(normal, ringNormal) / dot(sun, ringNormal);
+        if (k > 0.0) ball *= 1.0 - 0.55 * ringCover(length(normal + k * sun), 0.03) * lit;
+        // Thicker air near the edge: a tint of the atmosphere colour on the sunny side.
+        ball = mix(ball, atmosphere, pow(1.0 - front, 3.0) * 0.5 * lit);
+        color = over(color, ball, onBall);
+      }
+
+      // ...then the near side of the ring, in front of the ball.
+      if (ringInFront) color = over(color, ringC, ringA);
+
+      if (color.a < 0.002) discard;
+
+      // ---- Sky tint: paler and softer by day, clearer at night ----
+      // Like real air: the sky's own light is added on top of the planet, and
+      // a little of the planet's light is lost. By day that makes the lit side
+      // pale and the dark side almost melt into the sky; at night there's
+      // hardly any sky light, so it stays crisp.
+      float up = clamp(planetDirection.y / 0.6, 0.0, 1.0);
+      vec3 sky = mix(horizon, top, pow(up, 1.5)); // the sky colour behind it (same as the dome)
+      float haze = mix(${f(p.dayHaze)}, ${f(p.nightHaze)}, starsVisible);
+      vec3 rgb = color.rgb / color.a * (1.0 - haze * 0.5) + sky * haze;
+      gl_FragColor = vec4(rgb, color.a);
+      #include <colorspace_fragment>
+    }
+  `;
+}
+
+// One planet per entry in THEME.skyPlanets, plus which way it is in the sky.
+// `dome` is the sky dome (it shares the sun direction and sky colours).
+// `distance` is how far away it's drawn. dayNight.js keeps it there.
+export function makeSkyPlanets(dome, distance) {
+  const shared = dome.material.uniforms;
+  return THEME.skyPlanets.map((p) => {
+    const compass = THREE.MathUtils.degToRad(p.direction);
+    const height = THREE.MathUtils.degToRad(p.height);
+    // North = -z, east = +x.
+    const direction = new THREE.Vector3(
+      Math.sin(compass) * Math.cos(height), Math.sin(height), -Math.cos(compass) * Math.cos(height));
+
+    // The square faces you: "toward" points back at you, "across" and
+    // "upward" lie flat on it. It never moves across the sky, so these stay fixed.
+    const toward = direction.clone().negate();
+    const across = new THREE.Vector3(0, 1, 0).cross(toward).normalize();
+    const upward = toward.clone().cross(across);
+
+    // The ring: opened up by ringOpen (tipped towards you), then turned by ringTilt.
+    const open = Math.asin(Math.min(0.99, p.ringOpen));
+    const tilt = THREE.MathUtils.degToRad(p.ringTilt);
+    const tiltedUp = upward.clone().multiplyScalar(Math.cos(tilt)).addScaledVector(across, -Math.sin(tilt));
+    const ringNormal = tiltedUp.multiplyScalar(Math.cos(open)).addScaledVector(toward, Math.sin(open)).normalize();
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        sunDirection: shared.sunDirection,
+        horizon: shared.horizon,
+        top: shared.top,
+        starsVisible: shared.starsVisible,
+        planetDirection: { value: direction },
+        across: { value: across },
+        upward: { value: upward },
+        toward: { value: toward },
+        ringNormal: { value: ringNormal },
+        bands: { value: p.bands.map((c) => new THREE.Color(c)) },
+        nightSide: { value: new THREE.Color(p.nightSide) },
+        atmosphere: { value: new THREE.Color(p.atmosphere) },
+        ringColor: { value: new THREE.Color(p.ring) },
+        ringDark: { value: new THREE.Color(p.ringDark) },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: skyPlanetShader(p),
+      transparent: true,
+      depthWrite: false, // never hides anything behind it (land still hides it)
+      fog: false,        // it's far away on purpose
+    });
+
+    // Size: p.size is how many degrees across the ball looks.
+    const ballRadius = distance * Math.tan(THREE.MathUtils.degToRad(p.size) / 2);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+    mesh.scale.setScalar(ballRadius * PLANET_EXTENT);
+    mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(across, upward, toward));
+    mesh.frustumCulled = false; // it's moved every frame, always around you
+    return { mesh, direction };
+  });
 }
