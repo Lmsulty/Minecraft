@@ -3,8 +3,8 @@ import { BLOCK, isBreakableId, dropId } from './blocks.js';
 import { isPlaceableId, displayName } from './items.js';
 import { THEME } from './theme.js';
 import { bendMaterial } from './curve.js';
-import { blueprint, structure, MAIN } from './kevinBlueprints.js';
-import { NEXT_NAMES } from './kevinActions.js';
+import { blueprint, structure, facing, wantedSpot, at, MAIN } from './kevinBlueprints.js';
+import { NEXT_NAMES, LIST_NAMES } from './kevinActions.js';
 import { findSite } from './kevinSite.js';
 import { digPlan } from './kevinDig.js';
 import { pickLine } from './kevinBrain.js';
@@ -36,12 +36,13 @@ import { pickLine } from './kevinBrain.js';
 // if your inventory is full, the extra is lost). In creative it's all free.
 //
 // He stops if: the build is finished, you say "stop", you run out of blocks
-// halfway (e.g. you dropped some), or you walk more than 24 blocks away.
+// halfway (e.g. you dropped some), or the place he's working in unloads
+// because you went so far away (then he gives up and teleports back to you).
+// Walking away doesn't stop him otherwise: he stays put and finishes the job.
 
 // ==========================================================
 const PLACE_EVERY = 0.15;   // seconds between blocks
 const CLEAR_EVERY = 0.08;   // seconds between blocks while clearing (a tree is a lot of leaves)
-const GIVE_UP_DISTANCE = 24; // you walked this far away: he stops
 const POP_TIME = 0.3;       // seconds the sparkle round a new block lasts
 const BEAM_TIME = 0.12;     // seconds the beam from his antenna lasts
 const POP_COUNT = 6;        // sparkles that can show at once
@@ -56,6 +57,13 @@ export const THINGS = {
   tunnel: 'tunnel', stairs: 'staircase',
 };
 export const BUILDS = Object.keys(THINGS);
+
+// Jobs that need you to pick a spot (kevinOrders.js asks you where).
+export const NEEDS_SPOT = ['wall', 'tower', 'hut', 'bridge', 'tunnel', 'stairs'];
+// Reasons a job can't be done that are about the SPOT (pointing somewhere
+// else might fix them). Anything else (not enough blocks...) won't be fixed
+// by picking another spot.
+export const SPOT_PROBLEMS = ['noRoom', 'tooBumpy', 'yoursInTheWay', 'noGap', 'pointAtHill', 'nothingToDig', 'pointAtSpot'];
 const SITE_BUILDS = ['wall', 'tower', 'hut']; // these need a spot found (and maybe cleared) first
 const DIGS = ['tunnel', 'stairs'];            // these are dug (kevinDig.js)
 
@@ -139,11 +147,12 @@ export class KevinBuilder {
     return best;
   }
 
-  // Work out a build. Returns { ok: true, job } or { ok: false, line }
-  // (line = what he says instead, explaining why not).
+  // Work out a build. Returns { ok: true, job } or { ok: false, reason, line }
+  // (reason = e.g. 'noRoom' or 'notEnough', see SPOT_PROBLEMS; line = what he
+  // says instead, explaining why not).
   plan(kind) {
     const inv = this.inventory;
-    const refuse = (lineKind, count = 0, fill = {}) => ({ ok: false, line: pickLine(lineKind, count, fill) });
+    const refuse = (reason, count = 0, fill = {}) => ({ ok: false, reason, line: pickLine(reason, count, fill) });
     const aim = this.aimAt(); // the block you're pointing at right now (up to AIM_REACH away), or null
 
     // Digging: nothing needed but lamps, and those are optional (as many as you have).
@@ -220,6 +229,21 @@ export class KevinBuilder {
     return true;
   }
 
+  // Is all the ground the job touches still loaded? (Checking the corners of
+  // the box around it is enough: a job is never wider than a chunk.)
+  areaLoaded(job) {
+    if (!job.area) {
+      const all = [...job.clear, ...job.blocks];
+      job.area = {
+        minX: Math.min(...all.map((b) => b.x)), maxX: Math.max(...all.map((b) => b.x)),
+        minZ: Math.min(...all.map((b) => b.z)), maxZ: Math.max(...all.map((b) => b.z)),
+      };
+    }
+    const { minX, maxX, minZ, maxZ } = job.area;
+    return this.world.isLoadedAt(minX, minZ) && this.world.isLoadedAt(maxX, minZ) &&
+      this.world.isLoadedAt(minX, maxZ) && this.world.isLoadedAt(maxX, maxZ);
+  }
+
   // Is Kevin standing inside the box around these blocks?
   kevinInArea(blocks) {
     const p = this.kevin.body.position;
@@ -240,9 +264,8 @@ export class KevinBuilder {
     const job = this.job;
     if (!job) return;
 
-    const k = this.kevin.body.position;
-    const p = this.player.position;
-    if (Math.hypot(p.x - k.x, p.z - k.z) > GIVE_UP_DISTANCE) {
+    // The place he's working in has unloaded (you went very far away): give up.
+    if (!this.areaLoaded(job)) {
       this.finish('abandoned');
       return;
     }
@@ -331,12 +354,64 @@ export class KevinBuilder {
       this.talk.note(`Kevin ran out of ${fill.block} halfway through a ${thing}`);
       line = pickLine('outOfBlocks', 0, fill);
     } else if (result === 'abandoned') {
-      this.talk.note(`the player walked off while Kevin was building a ${thing}`);
-      line = pickLine('abandoned', 0, { thing });
+      this.talk.note(`the player went so far away that Kevin gave up on the ${thing}`);
+      line = pickLine('abandoned', 0, { what: LIST_NAMES[kind] });
+      // Back to you (unless you told him to stay put).
+      if (!this.kevin.staying) this.kevin.teleport({ quiet: true });
     }
 
     if (this.onJobEnd) this.onJobEnd({ kind, result, line, success });
     else if (line) this.talk.say(line, { interrupt: !success });
+  }
+
+  // ---- Previews, while you pick a spot (kevinOrders.js / kevinGhost.js) ----
+
+  // What a job would look like if he started it right now. Returns
+  //   { ok, cells, spot, plan }
+  //   ok     can it go here?
+  //   cells  boxes for the ghost: the blocks he'd place (or dig, for tunnels
+  //          and stairs); if it can't go here, roughly where it would have gone
+  //   spot   where you're pointing, and which way you face (for "hold steady")
+  //   plan   what plan() said
+  preview(kind) {
+    const dir = facing(this.player);
+    const aim = this.aimAt();
+    const p = this.player.position;
+    const feet = { x: Math.floor(p.x), y: Math.floor(p.y + 0.01), z: Math.floor(p.z) };
+    // The bridge goes from where you stand, so that's its spot; the rest go where you point.
+    const where = kind === 'bridge' || !aim ? feet : aim;
+    const spot = { x: where.x, y: where.y, z: where.z, fx: dir.fx, fz: dir.fz };
+    // Not pointing at anything (the sky, or too far away)? Nothing to show yet.
+    if (!this.hasSpot(kind)) {
+      return { ok: false, cells: [], spot, plan: { ok: false, reason: 'pointAtSpot' } };
+    }
+    const plan = this.plan(kind);
+    if (plan.ok) {
+      const job = plan.job;
+      return { ok: true, cells: DIGS.includes(kind) ? job.clear : job.blocks, spot, plan };
+    }
+    return { ok: false, cells: this.roughShape(kind, dir, aim, feet), spot, plan };
+  }
+
+  // Are you pointing somewhere he could put it? (The bridge goes from where
+  // you stand, so it doesn't need you to point.)
+  hasSpot(kind) {
+    return kind === 'bridge' || this.aimAt() !== null;
+  }
+
+  // Roughly where a job would go, for a red ghost when it can't go there.
+  roughShape(kind, dir, aim, feet) {
+    if (SITE_BUILDS.includes(kind)) {
+      return structure(kind, wantedSpot(kind, this.world, this.player, aim, dir), dir);
+    }
+    if (kind === 'bridge') {
+      const cells = [];
+      for (let along = 1; along <= 6; along++) cells.push(at({ ...feet, y: feet.y - 1 }, dir, along, 0, 0));
+      return cells;
+    }
+    if (kind === 'tunnel') return aim ? [aim, { x: aim.x, y: aim.y + 1, z: aim.z }] : [];
+    if (kind === 'stairs') return [aim ?? at({ ...feet, y: feet.y - 1 }, dir, 1, 0, 0)];
+    return [];
   }
 
   // ---- Survival: can you afford several jobs at once? ----

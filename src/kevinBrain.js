@@ -246,6 +246,23 @@ const LINES = {
     '{done} finished. On to {next}.',
     '{done}, sorted. Next, {next}.',
   ],
+  // Asking you where to put the next build ({thing} = "the bridge").
+  askWhere: [
+    'Right, where do you want {thing}?',
+    'Point me at a spot for {thing}, would you?',
+    'Where shall {thing} go, then? Point and hold, or press F.',
+  ],
+  // You pressed F while pointing at nothing.
+  pointAtSpot: [
+    'Point at something first. I can\'t build {thing} on thin air.',
+    'Aim at the ground where you want {thing}, then press F.',
+  ],
+  // You never picked a spot for it.
+  skipped: [
+    'I\'ll take that as a no on {thing}.',
+    'Nothing? I\'ll skip {thing}, then.',
+    'Indecision noted. Skipping {thing}.',
+  ],
   // Tacked onto a "that didn't work" line when there's more to do.
   movingOn: [
     'On to {next}.',
@@ -297,10 +314,10 @@ const LINES = {
     'I\'ve run out of {block}. Did you drop some?',
     'No more {block}, I\'m afraid. It\'ll have to do.',
   ],
-  // You walked off while he was building ({thing}).
+  // You went so far away that the place he was working in unloaded ({what} = "a hut", "some lamps").
   abandoned: [
-    'You wandered off, so I stopped the {thing}. Rude.',
-    'Building a {thing} for nobody. I gave up.',
+    'Making {what} for nobody. I gave up.',
+    'Making {what} for nobody? I gave up and came to find you.',
   ],
   // Can't build: not enough blocks (survival). {count} needed, {have} of {block}.
   notEnough: [

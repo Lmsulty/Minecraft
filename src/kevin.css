@@ -200,3 +200,49 @@
   opacity: 0.65;
   font-size: 12px;
 }
+
+/* Picking a spot for one of Kevin's builds (kevinGhost.js): a ring next to
+   the crosshair that fills up while you hold steady, and a hint underneath. */
+
+#kevin-pick {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(22px, 14px);
+  display: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--kevin-pick-text);
+  font: bold 12px/1.2 monospace;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 5;
+}
+
+#kevin-pick.is-visible {
+  display: flex;
+}
+
+#kevin-pick svg {
+  width: 26px;
+  height: 26px;
+  transform: rotate(-90deg); /* fill from the top */
+}
+
+#kevin-pick .track {
+  fill: none;
+  stroke: var(--kevin-pick-track);
+  stroke-width: 4;
+}
+
+#kevin-pick .fill {
+  fill: none;
+  stroke: var(--kevin-pick-ring);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+#kevin-pick.is-bad .fill {
+  stroke: var(--kevin-pick-ring-bad);
+}

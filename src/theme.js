@@ -222,6 +222,8 @@ export const THEME = {
       antenna: '#3c4552',
       tip: '#ff6b4a',        // glowing antenna tip
       buildSparkle: '#8affd0', // the beam and sparkle when he places a block (kevinBuild.js)
+      ghostGood: '#8affd0',  // see-through preview of a build, where it can go (kevinGhost.js)
+      ghostBad: '#ff5a4a',   // ...and where it can't
       // His face (kevinFace.js). The screen always shines, even at night.
       screenBg: '#0b2320',   // dark green-black screen
       screenLines: '#0f2b27', // faint TV lines across it
@@ -437,6 +439,10 @@ export const THEME = {
     '--kevin-rename-bg': 'rgba(24, 26, 32, 0.92)', // the "Rename your robot" box (press N)
     '--kevin-rename-border': 'rgba(138, 255, 208, 0.45)',
     '--kevin-rename-input-bg': 'rgba(255, 255, 255, 0.08)',
+    '--kevin-pick-ring': '#8affd0',               // the "hold steady" ring by the crosshair (kevinGhost.js)
+    '--kevin-pick-ring-bad': '#ff6b5a',           // ...when the spot won't work
+    '--kevin-pick-track': 'rgba(255, 255, 255, 0.25)',
+    '--kevin-pick-text': '#ffffff',
   },
 };
 

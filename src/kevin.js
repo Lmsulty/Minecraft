@@ -267,9 +267,10 @@ export class Kevin {
       return;
     }
     // The ground under HIM unloaded (you went far away): come back.
-    // Unless he's staying: then he waits right there until it loads again.
+    // Unless he's staying or building: then he waits right there (kevinBuild.js
+    // gives up on the job if the place he's working in unloads).
     if (!this.world.isLoadedAt(b.position.x, b.position.z)) {
-      if (this.staying) {
+      if (this.staying || this.working) {
         this.draw(dt);
         return;
       }
