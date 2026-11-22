@@ -620,6 +620,16 @@ export class Kevin {
 
   draw(dt) {
     const b = this.body;
+    // Hidden (inside the rocket during a cutscene): draw nothing. His head
+    // point goes far below the world, so his speech shows as the caption.
+    if (this.hidden) {
+      this.renderer.draw([], this.camera);
+      this.face.mesh.visible = false;
+      this.headPoint.set(b.position.x, -1000, b.position.z);
+      this.tag.update(this.headPoint, this.camera);
+      return;
+    }
+    this.face.mesh.visible = true;
     // The antenna tip blinks while he talks or builds.
     this.clock += dt;
     b.glow = (this.talking || this.working) && Math.sin(this.clock * ANTENNA_BLINK * Math.PI * 2) < 0 ? 0.3 : 1;

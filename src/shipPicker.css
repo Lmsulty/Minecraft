@@ -142,3 +142,56 @@
   font-size: 13px;
   opacity: 0.7;
 }
+
+/* ---- Cutscenes (cutscene.js) ---- */
+/* Black screen the cutscenes fade through */
+#cutscene-fade {
+  position: fixed;
+  inset: 0;
+  background: #000000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+/* "Space to skip", bottom right (shown/hidden by index.html's rules and .is-shown) */
+#cutscene-skip {
+  align-items: center;
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--ship-hint-bg);
+  color: var(--ship-hint-text);
+  font: 600 14px system-ui, sans-serif;
+  pointer-events: none;
+  z-index: 21;
+}
+/* During a cutscene, hide the things you only need while playing */
+body.in-cutscene #crosshair,
+body.in-cutscene #hotbar,
+body.in-cutscene #ship-hint,
+body.in-cutscene #kevin-tag,
+body.in-cutscene #creative-badge {
+  visibility: hidden;
+}
+
+/* "Click to step out", after landing: a message over the game view, not the
+   pause screen. The whole screen is the button. */
+#step-out {
+  position: fixed;
+  inset: 0;
+  align-items: flex-start;   /* in the upper part of the screen, clear of Kevin's */
+  justify-content: center;   /* caption and the hotbar at the bottom */
+  padding-top: 22vh;
+  box-sizing: border-box;
+  cursor: pointer;
+  z-index: 22;
+}
+#step-out span {
+  padding: 12px 24px;
+  border-radius: 8px;
+  background: var(--ship-hint-bg);
+  color: var(--ship-hint-text);
+  font: 600 22px system-ui, sans-serif;
+}

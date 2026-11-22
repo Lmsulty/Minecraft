@@ -1,6 +1,5 @@
 import './shipPicker.css';
 import { THEME } from './theme.js';
-import { travelTo } from './planets.js';
 
 // ==========================================================
 //  BOARDING THE SHIP and picking a planet.
@@ -11,8 +10,8 @@ import { travelTo } from './planets.js';
 //  on is greyed out. Click a card (or press its number) to travel there.
 //  Esc (or R again) closes it.
 //
-//  Travelling is instant for now (travelTo() in planets.js reloads the page
-//  as the new planet). You and Kevin start at the ship's ramp there.
+//  Picking a planet plays the takeoff cutscene (cutscene.js), then travels
+//  there. You and Kevin land at the ship's ramp there.
 // ==========================================================
 
 const BOARD_DISTANCE = 3;   // blocks from the foot of the ramp where you can board
@@ -33,7 +32,9 @@ export class ShipPicker {
   // root:   the empty <div> to build the picker screen in
   // player: the Player (where you are, and freeing/recapturing the mouse)
   // door:   the block column { x, z } at the foot of the ship's ramp
-  constructor(hint, root, player, door) {
+  // onPick: called with the chosen planet's name (starts the takeoff, cutscene.js)
+  constructor(hint, root, player, door, onPick) {
+    this.onPick = onPick;
     this.hint = hint;
     this.root = root;
     this.player = player;
@@ -92,7 +93,11 @@ export class ShipPicker {
 
   go(name) {
     if (name === THEME.planet) return;
-    travelTo(name); // saves, then reloads the page as that planet
+    // Hide the picker, but keep the mouse free (no pause screen): the takeoff
+    // cutscene plays now, then travels there.
+    this.isOpen = false;
+    this.root.classList.remove('is-open');
+    this.onPick(name);
   }
 
   setupControls() {

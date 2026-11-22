@@ -449,6 +449,9 @@ export const THEME = {
     engine: '#ffa040',     // glowing engine nozzle (glows)
     light: '#ffe9a0',      // lights by the door (glow)
     beacon: '#ff4a3a',     // blinking light on the nose (glows)
+    flame: '#ff7a20',      // engine flame during takeoff and landing
+    flameCore: '#fff0b0',  // its white-hot middle
+    smoke: '#d8d2c6',      // smoke and dust puffs at the base
   },
 
   // ---- Item pictures (see itemIcons.js for the patterns) ----

@@ -30,6 +30,29 @@ const LINES = {
     'Welcome back. I\'ve been standing here very patiently. Do take note.',
   ],
 
+  // Taking off in the rocket (cutscene.js).
+  takeoff: [
+    'Engines warm, seatbelt fastened. Mine, anyway.',
+    'Hold on to something. Preferably not me.',
+    'Liftoff. I\'d say I\'m excited, but I was built honest.',
+    'Another lap round the black hole. What could possibly go wrong.',
+  ],
+
+  // Landing somewhere with a time slip. {planet} = its name, {slip} = how
+  // much time passes at home for every minute there.
+  landing: [
+    '{planet}. Every minute here, home ages {slip}. Do try to be quick.',
+    'Touchdown. Mind the time slip: {slip} at home for every minute here.',
+    '{planet}, as promised. I\'d avoid dawdling. Home is ageing {slip} a minute.',
+  ],
+
+  // Landing back home.
+  landingHome: [
+    'Home again. Everything\'s a little older than we left it. Except me.',
+    'Back home. I\'d check the calendar, if I were you.',
+    'Home. The time slip has had its fun with us, I expect.',
+  ],
+
   // Every so often, when nothing's happening (daytime).
   idle: [
     'Lovely day for it. Whatever "it" is.',

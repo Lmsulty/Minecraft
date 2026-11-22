@@ -34,6 +34,8 @@ import { CHUNK_SIZE } from './world.js';
 //           sideways (the ramp). Legs and the ramp are beams, so they always
 //           reach the ground, however uneven it is.
 //   blink:  the light on the nose (blinks on and off)
+//   ramp:      the ramp: hidden while the door is shut (cutscenes)
+//   doorPanel: the shut door: only shown while the door is shut (cutscenes)
 
 // The body is round-ish: three overlapping boxes (a square plus a wide one
 // each way) give it a twelve-sided outline. `ring` makes a band around it
@@ -120,7 +122,8 @@ const PARTS = [
 
   // The door near the bottom, a short ramp down to the ground, and two door lights.
   { at: [2.25, 2.4, 0], size: [0.06, 1.8, 1.1], color: 'door' },
-  { beam: true, flat: true, from: [2.25, 1.45, 0], ground: [4.0, 0], lift: 0.06, thick: [0.12, 1.2], color: 'metal' },
+  { at: [2.27, 2.4, 0], size: [0.06, 1.8, 1.1], color: 'hull', doorPanel: true }, // the door, shut (cutscenes)
+  { beam: true, flat: true, ramp: true, from: [2.25, 1.45, 0], ground: [4.0, 0], lift: 0.06, thick: [0.12, 1.2], color: 'metal' },
   { at: [2.27, 3.5, -0.75], size: [0.08, 0.15, 0.15], color: 'light', glow: true },
   { at: [2.27, 3.5, 0.75], size: [0.08, 0.15, 0.15], color: 'light', glow: true },
 ];
@@ -132,7 +135,8 @@ const RAMP_FOOT = new THREE.Vector3(4.8, 0, 0);
 const SITE_DISTANCES = [7, 8, 9, 10, 11, 12]; // blocks from where you start (the base is about 8 wide)
 const SITE_DIRECTIONS = 24;                    // directions tried around it
 const MAX_BUMPINESS = 2;                       // ground under it may rise and fall this much at most
-const BLINK_SECONDS = 1.2;                     // the tail light: one blink per this many seconds
+const BLINK_SECONDS = 1.2;
+const FLAME_TOP = 0.3;                         // the bottom of the engine nozzle, above the ground (ship coordinates)                     // the tail light: one blink per this many seconds
 
 // The box for one part, placed in the world: ship position + facing, then
 // the part's own spot, tilt and size. `drop` stretches a leg further down.
@@ -300,6 +304,15 @@ export function chooseShipSite(terrain, editStore, near) {
 export class Ship {
   constructor(scene, site) {
     const colors = THEME.ship;
+    this.site = site;
+    // Everything is in one group, so the cutscenes (cutscene.js) can lift the
+    // whole rocket: group.position.y = how far above its landing spot it is.
+    this.group = new THREE.Group();
+    scene.add(this.group);
+    this.hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    this.ramp = [];      // ramp parts (shown while the door is open)
+    this.doorPanel = []; // closed-door parts (shown while it's shut)
+    this.meshes = [];
     const make = (glow) => {
       const parts = PARTS.map((part, i) => ({ part, matrix: site.matrices[i] })).filter(({ part }) => !!part.glow === glow);
       const mesh = new THREE.InstancedMesh(CUBE, glow ? GLOW_MATERIAL : MATERIAL, parts.length);
@@ -308,24 +321,73 @@ export class Ship {
         mesh.setMatrixAt(i, matrix);
         mesh.setColorAt(i, new THREE.Color(colors[part.color]));
         if (part.blink) this.blink = { mesh, index: i, matrix };
+        if (part.ramp) this.ramp.push({ mesh, index: i, matrix });
+        if (part.doorPanel) this.doorPanel.push({ mesh, index: i, matrix });
       });
       mesh.frustumCulled = false; // its box would be checked unbent (curve.js); it's cheap to always draw
-      scene.add(mesh);
-      return mesh;
+      this.group.add(mesh);
+      this.meshes.push(mesh);
     };
     make(false);
     make(true);
+
+    // The engine flame (hidden until a cutscene fires the engine). Two
+    // see-through glowing boxes, one inside the other, that add their light
+    // to whatever's behind them. Made now, so nothing new is set up mid-cutscene.
+    const flameMaterial = (color, opacity) => new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    });
+    this.flameOuter = new THREE.Mesh(CUBE, flameMaterial(colors.flame, 0.75));
+    this.flameInner = new THREE.Mesh(CUBE, flameMaterial(colors.flameCore, 0.9));
+    for (const flame of [this.flameOuter, this.flameInner]) {
+      flame.frustumCulled = false;
+      this.group.add(flame);
+    }
+    this.throttle = 0;   // 0 = engine off, 1 = full power
+    this.trail = 0;      // extra flame length while flying, in blocks
     this.time = 0;
-    this.hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+
+    this.setDoorOpen(true);
   }
 
-  // Call every frame: blinks the light on the tail fin.
+  // Open: doorway and ramp down. Shut: a panel over the doorway, ramp tucked away.
+  setDoorOpen(open) {
+    for (const { mesh, index, matrix } of this.ramp) mesh.setMatrixAt(index, open ? matrix : this.hidden);
+    for (const { mesh, index, matrix } of this.doorPanel) mesh.setMatrixAt(index, open ? this.hidden : matrix);
+    for (const mesh of this.meshes) mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // How far above its landing spot the rocket is (blocks).
+  setLift(height) {
+    this.group.position.y = height;
+  }
+
+  // Engine power (0..1) and how long the flame trail is (blocks).
+  setEngine(throttle, trail = 0) {
+    this.throttle = throttle;
+    this.trail = trail;
+  }
+
+  // Call every frame: blinks the nose light and flickers the flame.
   update(dt) {
     this.time += dt;
-    if (!this.blink) return;
-    const on = (this.time % BLINK_SECONDS) < BLINK_SECONDS * 0.3;
-    const { mesh, index, matrix } = this.blink;
-    mesh.setMatrixAt(index, on ? matrix : this.hidden);
-    mesh.instanceMatrix.needsUpdate = true;
+    if (this.blink) {
+      const on = (this.time % BLINK_SECONDS) < BLINK_SECONDS * 0.3;
+      const { mesh, index, matrix } = this.blink;
+      mesh.setMatrixAt(index, on ? matrix : this.hidden);
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    // The flame hangs under the engine nozzle, flickering.
+    const { origin } = this.site;
+    const power = this.throttle;
+    const flicker = 1 + Math.sin(this.time * 47) * 0.08 + Math.sin(this.time * 31) * 0.06;
+    const length = power > 0 ? (0.6 + power * 2.2 + this.trail) * flicker : 0;
+    const width = power > 0 ? (1.2 + power * 0.8) * (2 - flicker) : 0;
+    const top = origin.y + FLAME_TOP;
+    this.flameOuter.scale.set(width, length, width);
+    this.flameOuter.position.set(origin.x, top - length / 2, origin.z);
+    this.flameInner.scale.set(width * 0.55, length * 0.7, width * 0.55);
+    this.flameInner.position.set(origin.x, top - length * 0.35, origin.z);
+    this.flameOuter.visible = this.flameInner.visible = power > 0;
   }
 }

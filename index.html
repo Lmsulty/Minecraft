@@ -4,7 +4,44 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Untitled Voxel Game</title>
+    <script>
+      // Runs before anything else loads. Arriving by ship (cutscene.js)? Then
+      // the page starts completely black, so there's no flash between the
+      // takeoff fading out and the landing fading in.
+      try {
+        if (sessionStorage.getItem('voxelgame.arrivingByShip') === '1') {
+          document.documentElement.classList.add('arriving');
+        }
+      } catch (err) { /* storage blocked: just load normally */ }
+    </script>
     <style>
+      /* ---- Before the game is ready (main.js adds "game-ready") ---- */
+      /* Nothing half-loaded shows: no "Click to play", no unstyled text. */
+      html:not(.game-ready) #overlay,
+      #cutscene-skip,
+      #step-out {
+        display: none !important;
+      }
+      html.game-ready #cutscene-skip.is-shown,
+      html.game-ready #step-out.is-shown {
+        display: flex !important;
+      }
+      /* Arriving by ship: black from the very first moment, until the landing starts. */
+      html.arriving,
+      html.arriving body {
+        background: #000000;
+      }
+      #arrival-cover {
+        display: none;
+      }
+      html.arriving #arrival-cover {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: #000000;
+        z-index: 30;
+      }
+
       /* Colours come from src/theme.js (THEME.ui), which sets these var(--...) values. */
       html, body {
         margin: 0;
@@ -153,6 +190,7 @@
     </style>
   </head>
   <body>
+    <div id="arrival-cover"></div>
     <div id="kevin-tag"></div>
     <div id="kevin-bubble"></div>
     <div id="kevin-caption"></div>
@@ -165,6 +203,9 @@
     <div id="inventory"></div>
     <div id="ship-hint"></div>
     <div id="ship-picker"></div>
+    <div id="cutscene-fade"></div>
+    <div id="cutscene-skip">Space to skip</div>
+    <div id="step-out"><span>Click to step out</span></div>
     <div id="kevin-rename"></div>
     <div id="kevin-chat"></div>
     <div id="overlay">

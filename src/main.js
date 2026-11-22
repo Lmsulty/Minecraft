@@ -11,7 +11,8 @@ import { Inventory } from './inventory.js';
 import { CreativeToggle } from './creative.js';
 import { InventoryScreen } from './inventoryScreen.js';
 import { applyUiTheme, THEME, PLANET } from './theme.js';
-import { setupDebugPlanetKey } from './planets.js';
+import { setupDebugPlanetKey, takeArrival } from './planets.js';
+import { Cutscene } from './cutscene.js';
 import { Ship, chooseShipSite } from './ship.js';
 import { ShipPicker } from './shipPicker.js';
 import { DayNight } from './dayNight.js';
@@ -186,12 +187,25 @@ graphics.attach({
   notice: document.getElementById('notice'),
 });
 
-// ---- Boarding the ship: near its ramp, press R to pick a planet (shipPicker.js) ----
-const shipPicker = new ShipPicker(document.getElementById('ship-hint'),
-  document.getElementById('ship-picker'), player, shipSite.door);
+// ---- Takeoff and landing cutscenes (cutscene.js) ----
+const cutscene = new Cutscene({
+  scene, camera, player, kevin, talk: kevinTalk, ship, world, dayNight,
+  getHaze: () => graphics.level.haze,
+  fade: document.getElementById('cutscene-fade'),
+  skipHint: document.getElementById('cutscene-skip'),
+  cover: document.getElementById('arrival-cover'),
+  stepOut: document.getElementById('step-out'),
+});
+// Arrived by ship? Then the rocket comes in to land first.
+if (takeArrival()) cutscene.landing();
 
-// ---- Debug: press P to jump to the next planet (switch off in planets.js) ----
-setupDebugPlanetKey();
+// ---- Boarding the ship: near its ramp, press R to pick a planet (shipPicker.js) ----
+// Picking a planet plays the takeoff, then travels there.
+const shipPicker = new ShipPicker(document.getElementById('ship-hint'),
+  document.getElementById('ship-picker'), player, shipSite.door, (name) => cutscene.takeoff(name));
+
+// ---- Debug: press P to jump to the next planet, no cutscene (switch off in planets.js) ----
+setupDebugPlanetKey(() => !!cutscene.active);
 
 // ---- "Reset world" button on the pause screen ----
 document.getElementById('reset').addEventListener('click', (e) => {
@@ -210,6 +224,9 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// Everything's set up: "Click to play" (or the landing) can show now (see index.html).
+document.documentElement.classList.add('game-ready');
+
 // ---- Game loop: runs about 60 times per second ----
 let lastTime = performance.now();
 function loop(now) {
@@ -219,7 +236,7 @@ function loop(now) {
   lastTime = now;
 
   world.update(player.position.x, player.position.z); // load/unload chunks, a few ms at most
-  player.update(dt);
+  if (!cutscene.active) player.update(dt); // during a cutscene the camera is the cutscene's
   mobs.update(dt);     // after the player moves, so they react to where you are now
   kevin.update(dt);    // same for Kevin
   ship.update(dt);     // blinks the light on its nose
@@ -228,7 +245,9 @@ function loop(now) {
   kevinOrders.update(dt);  // starts his next job, or waits for you to pick a spot
   kevinTalk.update(dt); // after Kevin moves, so his speech bubble follows him
   interaction.update();
+  cutscene.update(dt);  // moves the rocket and the camera (only during a cutscene)
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera
+  cutscene.updateSky(); // takeoff: darkens the sky (after dayNight has set its colours)
   underwater.update();  // after dayNight, which sets the haze colour every frame
   updateCurve(camera);                   // the cylinder bend starts at the camera
   cullBentChunks(world.group, camera);   // skip chunks that are off-screen (after bending)
