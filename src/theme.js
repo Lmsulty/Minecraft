@@ -18,7 +18,8 @@ export const THEME = {
   //   description: one line about it, on its card in the ship's planet picker
   //   timeSlip: how much faster time passes at home while you're here. Planets
   //            closer to the black hole have a bigger slip (1 = none).
-  //   color:   the stripe on its card in the planet picker
+  //   color:   its dot on the ship's star map (the planet picker)
+  //   orbit:   which ring it's on in the star map (1 = closest to the black hole)
   //   seed:    the number its terrain grows from. Changing it gives a brand new
   //            world (and the old save for that planet no longer lines up).
   //   changes: settings that are DIFFERENT from home. Anything you put here
@@ -32,6 +33,7 @@ export const THEME = {
       description: 'Golden meadows, tiered forests and deep caves.',
       timeSlip: 1,
       color: '#9fc0d0',
+      orbit: 3,
       seed: 12345,
       changes: {},
     },
@@ -40,6 +42,7 @@ export const THEME = {
       description: 'Shallow teal seas, pale sand islands and a ringed planet overhead.',
       timeSlip: 60,
       color: '#3fb0c8',
+      orbit: 1,
       seed: 777,
       changes: {
         // Low ground under a shallow sea, with sandy islands poking out.
@@ -105,6 +108,7 @@ export const THEME = {
       description: 'Black glass hills split by glowing cracks, under a dark red sky.',
       timeSlip: 10,
       color: '#c0582a',
+      orbit: 2,
       seed: 4242,
       changes: {
         // Rugged hills of black glass, split by glowing orange cracks.
@@ -700,12 +704,27 @@ export const THEME = {
     '--ship-hint-bg': 'rgba(0, 0, 0, 0.55)',      // "Press R to board" near the ship's ramp
     '--ship-hint-text': '#ffffff',
     '--ship-hint-key': '#7ff5e8',                 // the R (the ship's window colour)
-    '--picker-card-bg': 'rgba(255, 255, 255, 0.06)', // a planet card in the ship's planet picker
-    '--picker-card-border': 'rgba(255, 255, 255, 0.2)',
-    '--picker-card-hover': 'rgba(255, 255, 255, 0.16)',
-    '--picker-card-hover-border': '#7ff5e8',
-    '--picker-slip-text': '#ffd27a',              // the time slip line
-    '--picker-here-text': '#8affd0',              // "You are here"
+    // The ship's star map (planet picker, shipPicker.js)
+    '--map-bg': '#0a1016',                        // the nav room behind everything
+    '--map-vignette': 'rgba(0, 0, 0, 0.75)',      // darker towards the edges
+    '--map-grid': 'rgba(127, 245, 232, 0.05)',    // faint grid lines
+    '--map-title': '#7ff5e8',                     // "STAR MAP"
+    '--map-orbit': 'rgba(127, 245, 232, 0.22)',   // the dashed orbit rings
+    '--map-orbit-hot': 'rgba(127, 245, 232, 0.8)', // ...the selected planet's ring
+    '--map-label': 'rgba(255, 255, 255, 0.6)',    // planet names on the map
+    '--map-label-hot': '#ffffff',                 // ...the selected planet's name
+    '--map-here': '#8affd0',                      // "you are here"
+    '--map-panel-bg': 'rgba(127, 245, 232, 0.05)', // the info panel on the right
+    '--map-panel-border': 'rgba(127, 245, 232, 0.3)',
+    '--map-dim-text': 'rgba(255, 255, 255, 0.55)', // "DESTINATION 2", box labels, the hint
+    '--map-text': '#e8f4f2',
+    '--map-slip-text': '#ffd27a',                 // the time slip line
+    '--map-box-bg': 'rgba(0, 0, 0, 0.35)',        // the SHIP TIME / HOME TIME boxes
+    '--map-launch-bg': '#ff8a3a',                 // the LAUNCH button
+    '--map-launch-hover': '#ffa45e',
+    '--map-launch-text': '#1a0c04',
+    '--map-launch-off-bg': 'rgba(255, 255, 255, 0.1)', // ...greyed out ("YOU ARE HERE")
+    '--map-launch-off-text': 'rgba(255, 255, 255, 0.45)',
   },
 };
 
