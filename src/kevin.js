@@ -311,7 +311,7 @@ export class Kevin {
     this.shadeTimer -= dt;
     if (this.shadeTimer <= 0) {
       this.shadeTimer = SHADE_EVERY;
-      const covered = this.world.getSurfaceY(b.position.x, b.position.z) > Math.floor(b.position.y) + 2;
+      const covered = this.world.getGroundY(b.position.x, b.position.z) > Math.floor(b.position.y) + 2;
       b.shade = covered ? THEME.mobs.underCover : 1;
     }
 

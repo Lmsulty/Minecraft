@@ -20,10 +20,10 @@ import { THEME } from './theme.js';
 const BOARD_DISTANCE = 3;   // blocks from the foot of the ramp where you can board
 const BOARD_HEIGHT = 3;     // ...and at most this far above or below it
 
-// ---- The star map (sizes in map units: the map is 280 wide, 230 tall, the black hole in the middle) ----
-const ORBIT_RADII = [0, 46, 68, 90];       // ring 1 (closest), 2, 3
+// ---- The star map (sizes in map units: the map is 310 wide, 230 tall, the black hole in the middle) ----
+const ORBIT_RADII = [0, 40, 58, 76, 94];   // ring 1 (closest), 2, 3, 4
 const ORBIT_SPEED = 0.35;                  // how fast planets drift (ring 1 goes round in about 18 seconds)
-const START_ANGLES = [0, 0.7, 2.8, 4.6];   // where each ring's planet starts (radians)
+const START_ANGLES = [0, 0.7, 2.8, 4.6, 1.6]; // where each ring's planet starts (radians)
 const PLANET_SIZE = 5;                     // radius of a planet's dot
 const HOLE_SIZE = 17;                      // the black hole, ring included
 
@@ -83,7 +83,7 @@ export class ShipPicker {
       <div class="map-room">
         <h2 class="map-title">STAR MAP</h2>
         <div class="map-layout">
-          <svg class="map-chart" viewBox="-140 -115 280 230" role="img" aria-label="Star map">
+          <svg class="map-chart" viewBox="-155 -115 310 230" role="img" aria-label="Star map">
             <defs>
               <radialGradient id="map-hole">
                 <stop offset="0.74" stop-color="#000000"></stop>

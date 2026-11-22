@@ -53,6 +53,23 @@ function addGlowLight(material) {
   return material;
 }
 
+// Keep each face's texture inside its own tile. With edge smoothing
+// (antialias) on, the very edge of a face can be coloured as if from just
+// outside it, which reads a sliver of the NEXT tile in the atlas: faint
+// dots along block edges seen at a low angle (e.g. orange from the ember
+// crack along the edges of the snow beside it). "centroid" tells the
+// graphics card to always read from inside the face instead.
+function sampleInsideFaces(material) {
+  const before = material.onBeforeCompile;
+  const inside = (chunk) => THREE.ShaderChunk[chunk].replace('varying vec2 vMapUv;', 'centroid varying vec2 vMapUv;');
+  material.onBeforeCompile = (shader, renderer) => {
+    before(shader, renderer);
+    shader.vertexShader = shader.vertexShader.replace('#include <uv_pars_vertex>', inside('uv_pars_vertex'));
+    shader.fragmentShader = shader.fragmentShader.replace('#include <uv_pars_fragment>', inside('uv_pars_fragment'));
+  };
+  return material;
+}
+
 // ---- Materials (shared by every chunk) ----
 const atlas = createAtlasTexture();
 const MATERIALS = {
@@ -71,7 +88,14 @@ const MATERIALS = {
     map: atlas, vertexColors: true, transparent: true, opacity: THEME.waterOpacity,
     depthWrite: false, side: THREE.DoubleSide,
   })),
+  // Crystal (the ice planet's glowing crystal ice): always bright like
+  // 'glow', and see-through like water, but each pixel of its texture says
+  // how see-through it is (its facet lines are nearly solid, the rest clear-ish).
+  crystal: bendMaterial(new THREE.MeshBasicMaterial({
+    map: atlas, vertexColors: true, transparent: true, depthWrite: false, alphaTest: 0.02,
+  })),
 };
+Object.values(MATERIALS).forEach(sampleInsideFaces);
 // Blocks lit by the sun and sky also catch spilled glow (if it's on for this planet).
 if (GLOW_ON) [MATERIALS.opaque, MATERIALS.cutout, MATERIALS.water].forEach(addGlowLight);
 
@@ -87,6 +111,10 @@ const BRIGHTNESS = (() => {
     );
     levels.push([color.r, color.g, color.b]);
   }
+  // Glowing blocks themselves are one level above full (see computeLight).
+  // You can see a face through a see-through glowing block (crystal ice), so
+  // that level is full brightness too.
+  levels.push(levels[LIGHT_SPREAD]);
   return levels;
 })();
 
@@ -243,7 +271,7 @@ class FaceList {
   }
 }
 // One reusable list per render type (see MATERIALS above).
-const LISTS = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceList(), water: new FaceList() };
+const LISTS = { opaque: new FaceList(), cutout: new FaceList(), glow: new FaceList(), water: new FaceList(), crystal: new FaceList() };
 
 // ---- Scratch memory, reused for every chunk ----
 // Building a chunk needs a few big temporary arrays. Making new ones every
@@ -470,8 +498,8 @@ export function buildChunkMesh(world, chunk, chunkSize, worldHeight) {
           if (blocks[n] === id && !IS_OPAQUE[id]) continue;
           // Tint the face by the light in the air just in front of it.
           const tint = BRIGHTNESS[light[n]];
-          // Glowing blocks and water are never shaded; everything else gets soft corner shadows.
-          if (!AO_ON || list === lists.glow || list === lists.water) {
+          // Glowing blocks, water and crystal are never shaded; everything else gets soft corner shadows.
+          if (!AO_ON || list === lists.glow || list === lists.water || list === lists.crystal) {
             list.addFace(ox + lx, y, oz + lz, FACES[f], uvs[f], tint, NO_SHADE, glow ? GLOW_AMOUNT[glow[n]] : 0);
             continue;
           }

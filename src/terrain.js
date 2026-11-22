@@ -5,7 +5,9 @@ import { treeAtColumn, treeBlockAt } from './trees.js';
 import { THEME } from './theme.js';
 
 // Decides what the untouched world looks like at any spot: hills, caves,
-// sinkholes and hillside entrances leading into them, sand in low ground, trees, and the unbreakable floor. It only uses seeded noise, so the same seed always
+// sinkholes and hillside entrances leading into them, sand in low ground, trees, and the unbreakable floor.
+// (Plus, on planets that switch them on: glowing cracks, crevasses, crystal
+// clusters and frozen clouds.) It only uses seeded noise, so the same seed always
 // gives the same world, and any chunk can be thrown away and rebuilt
 // identically later. world.js (generating chunks) and the save system
 // (blockAt) both use the SAME functions here, so they always agree.
@@ -21,6 +23,9 @@ const SAND = T.sand;
 const SEA_LEVEL = T.seaLevel; // 0 = no sea
 const SEA_SLOPE = 4;          // the sea gets 1 block deeper for every this many blocks the ground drops
 const CRACKS = T.cracks;      // glowing cracks across the ground (null = none)
+const CREVASSES = T.crevasses; // deep narrow cracks in the ground (null = none)
+const CRYSTALS = T.crystals;   // clusters of glowing crystal sticking up (null = none)
+const CLOUDS = T.frozenClouds; // shelves of ice floating high up (null = none)
 
 // The blocks the ground is made of on this planet (THEME.terrain.blocks).
 function blockIdByName(name) {
@@ -31,6 +36,7 @@ function blockIdByName(name) {
 const SURFACE = blockIdByName(T.blocks.surface);
 const UNDER_SURFACE = blockIdByName(T.blocks.underSurface);
 const ROCK = blockIdByName(T.blocks.rock);
+const LOWLAND = blockIdByName(SAND.block); // the block in the low patches (sand at home)
 
 // ---- Cave settings ----
 const CAVE_MIN_Y = 2;          // caves never go below this, so the floor stays thick
@@ -108,6 +114,9 @@ export class Terrain {
     this.sandNoise = createNoise2D(makeRandom((seed ^ 0x5a4d5a4d) >>> 0));
     // So do the cracks (only planets with cracks use them).
     this.crackNoise = createNoise2D(makeRandom((seed ^ 0x3c6ef372) >>> 0));
+    // And the ice planet's crevasses and frozen clouds.
+    this.crevasseNoise = createNoise2D(makeRandom((seed ^ 0x1b873593) >>> 0));
+    this.cloudNoise = createNoise2D(makeRandom((seed ^ 0x6b43a9b5) >>> 0));
     // No caves on this planet = no starter sinkhole either.
     this.starter = T.caves ? this.pickStarterSinkhole() : null;
   }
@@ -148,15 +157,19 @@ export class Terrain {
     col.tree = treeAtColumn(this, x, z); // tree trunk/leaves above this column, or null
     // Highest block this column can have (used to know how far up to fill).
     // Water reaches up to sea level, so fill at least that high.
-    col.top = Math.max(col.tree ? col.tree.top : col.height, col.height, SEA_LEVEL);
+    col.top = Math.max(col.tree ? col.tree.top : col.height, col.height + col.crystal, SEA_LEVEL, col.cloud ? col.cloud.top : 0);
     return col;
   }
 
-  // Like column(), but without trees: just the ground and the caves in it.
+  // Like column(), but without trees: just the ground and the caves in it
+  // (and on the ice planet: crevasses, crystals and frozen clouds).
   groundColumn(x, z) {
     const height = this.height(x, z);
     const crack = this.isCracked(x, z);
-    if (!T.caves) return { height, sinkholes: [], tunnels: [], sand: this.isSandy(x, z, height), crack };
+    const crevasse = this.crevasseDepth(x, z);
+    const crystal = crevasse ? 0 : this.crystalHeight(x, z);
+    const cloud = this.cloudAt(x, z, height);
+    if (!T.caves) return { height, sinkholes: [], tunnels: [], sand: this.isSandy(x, z, height), crack, crevasse, crystal, cloud };
     // Sinkholes close enough to carve this column: the one in this cell, and the starter.
     const sinkholes = [];
     for (const s of [this.sinkholeFor(x, z), this.starter]) {
@@ -165,7 +178,105 @@ export class Terrain {
     // Hillside tunnels passing over/under this column.
     const nearby = this.tunnelsNearCell(Math.floor(x / HILLSIDE_CELL), Math.floor(z / HILLSIDE_CELL));
     const tunnels = nearby.filter((t) => x >= t.minX && x <= t.maxX && z >= t.minZ && z <= t.maxZ);
-    return { height, sinkholes, tunnels, sand: this.isSandy(x, z, height), crack };
+    return { height, sinkholes, tunnels, sand: this.isSandy(x, z, height), crack, crevasse, crystal, cloud };
+  }
+
+  // ---- Ice planet features (see THEME.terrain.crevasses / crystals / frozenClouds) ----
+
+  // How many blocks deep a crevasse cuts into column (x, z) (0 = none).
+  // Like the cracks, crevasses follow the lines where a wavy pattern passes
+  // through zero. They're deepest in the middle of the line and shallower
+  // towards its edges, so each one is a narrow V. A second, slower pattern
+  // makes them come and go, so they're separate cracks, not one big network.
+  crevasseDepth(x, z) {
+    if (!CREVASSES) return 0;
+    const across = Math.abs(this.crevasseNoise(x * CREVASSES.scale, z * CREVASSES.scale)) / CREVASSES.width;
+    if (across >= 1) return 0;
+    const along = this.crevasseNoise(x * CREVASSES.scale * 0.4 + 300, z * CREVASSES.scale * 0.4 - 300);
+    if (along < CREVASSES.gaps) return 0;
+    const strength = Math.min(1, (along - CREVASSES.gaps) / 0.3); // fades in at each end
+    return Math.round(CREVASSES.depth * strength * (1 - across * across));
+  }
+
+  // A crystal cluster in a grid cell, or null. Worked out once per cell.
+  crystalClusterFor(cellX, cellZ) {
+    return this.cached(`c${cellX},${cellZ}`, () => {
+      const rand = this.cellRandom(cellX, cellZ, 0x7f4a7c15);
+      if (rand() >= CRYSTALS.chance) return null;
+      const margin = CRYSTALS.radius + 1; // stays inside its cell
+      const span = CRYSTALS.cell - margin * 2;
+      return {
+        x: cellX * CRYSTALS.cell + margin + rand() * span,
+        z: cellZ * CRYSTALS.cell + margin + rand() * span,
+        tallest: CRYSTALS.height[0] + rand() * (CRYSTALS.height[1] - CRYSTALS.height[0]),
+      };
+    });
+  }
+
+  // How many blocks of crystal stick up out of column (x, z) (0 = none).
+  // Shards in a cluster: tallest in the middle, some columns left empty.
+  crystalHeight(x, z) {
+    if (!CRYSTALS) return 0;
+    const c = this.crystalClusterFor(Math.floor(x / CRYSTALS.cell), Math.floor(z / CRYSTALS.cell));
+    if (!c) return 0;
+    const d = Math.hypot(x + 0.5 - c.x, z + 0.5 - c.z);
+    if (d > CRYSTALS.radius) return 0;
+    const rand = this.cellRandom(x, z, 0x2f6b9d31); // this column's own numbers
+    if (d > 0.8 && rand() < CRYSTALS.gaps) return 0;
+    return Math.max(1, Math.round(c.tallest * (1 - d / (CRYSTALS.radius + 0.5)) + rand() * 1.5));
+  }
+
+  // The frozen cloud shelf in a grid cell, or null. Worked out once per cell.
+  // A flat oval of ice (a little wobbly round the edge) floating `above`
+  // blocks over the ground at its middle.
+  cloudShelfFor(cellX, cellZ) {
+    return this.cached(`f${cellX},${cellZ}`, () => {
+      const rand = this.cellRandom(cellX, cellZ, 0x4cf5ad43);
+      if (rand() >= CLOUDS.chance) return null;
+      const between = ([lo, hi]) => lo + rand() * (hi - lo);
+      const x = (cellX + 0.2 + rand() * 0.6) * CLOUDS.cell;
+      const z = (cellZ + 0.2 + rand() * 0.6) * CLOUDS.cell;
+      const top = Math.min(this.worldHeight - 3,
+        this.height(Math.floor(x), Math.floor(z)) + Math.round(between(CLOUDS.above)));
+      return { x, z, top, rx: between(CLOUDS.radius), rz: between(CLOUDS.radius), turn: rand() * Math.PI };
+    });
+  }
+
+  // The frozen cloud over column (x, z): { bottom, top } (block heights,
+  // both filled), or null. Its top is flat (to walk on); its bottom is
+  // lumpy, thickest in the middle, with icicles hanging down here and there.
+  // `ground` = the ground height there: clouds always stay well above it.
+  cloudAt(x, z, ground) {
+    if (!CLOUDS) return null;
+    const cellX = Math.floor(x / CLOUDS.cell);
+    const cellZ = Math.floor(z / CLOUDS.cell);
+    let best = null;
+    // A shelf can stretch over the edge of its cell, so check the cells around too.
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const s = this.cloudShelfFor(cellX + dx, cellZ + dz);
+        if (!s) continue;
+        const px = x + 0.5 - s.x;
+        const pz = z + 0.5 - s.z;
+        if (Math.abs(px) > CLOUDS.radius[1] * 1.5 || Math.abs(pz) > CLOUDS.radius[1] * 1.5) continue;
+        // Turned oval, with a wobbly edge.
+        const u = (px * Math.cos(s.turn) + pz * Math.sin(s.turn)) / s.rx;
+        const v = (pz * Math.cos(s.turn) - px * Math.sin(s.turn)) / s.rz;
+        const edge = 1 + CLOUDS.wobble * this.cloudNoise(x * 0.09, z * 0.09);
+        const inside = 1 - (u * u + v * v) / edge; // 1 = the middle, 0 = the edge
+        if (inside <= 0 || (best && inside <= best.inside)) continue;
+        best = { inside, top: s.top };
+      }
+    }
+    if (!best) return null;
+    const lumps = (this.cloudNoise(x * 0.12 + 50, z * 0.12 - 50) + 1) / 2; // 0..1
+    let thick = 1 + Math.floor(Math.sqrt(best.inside) * CLOUDS.thickness + lumps * CLOUDS.lumps * best.inside);
+    const rand = this.cellRandom(x, z, 0x1d2e3f4b); // this column's own numbers
+    if (best.inside > 0.15 && rand() < CLOUDS.icicles) {
+      thick += Math.round(CLOUDS.icicleLength[0] + rand() * (CLOUDS.icicleLength[1] - CLOUDS.icicleLength[0]));
+    }
+    const bottom = Math.max(best.top - thick + 1, ground + CLOUDS.minClearance);
+    return bottom <= best.top ? { bottom, top: best.top } : null;
   }
 
   // Does a glowing crack run through column (x, z)? (see THEME.terrain.cracks)
@@ -450,15 +561,18 @@ export class Terrain {
   // The original block at height y in a column (see column()).
   blockInColumn(x, y, z, col) {
     if (y === 0) return BLOCK.CORE;               // unbreakable floor
-    // Above the ground: a tree, or open air. (Trees never fill caves.)
+    if (col.cloud && y >= col.cloud.bottom && y <= col.cloud.top) return BLOCK.CLOUD_ICE; // a frozen cloud
+    // Above the ground: crystal, a tree, or open air. (Trees never fill caves.)
     // Below sea level, the open space is water instead.
     if (y > col.height) {
+      if (y <= col.height + col.crystal) return BLOCK.CRYSTAL_ICE;
       const tree = col.tree ? treeBlockAt(col.tree, x, y, z) : BLOCK.AIR;
       return tree === BLOCK.AIR && y <= SEA_LEVEL ? BLOCK.WATER : tree;
     }
+    if (col.crevasse && y > col.height - col.crevasse) return BLOCK.AIR;
     if (this.isCave(x, y, z, col)) return BLOCK.AIR;
     if (col.crack && y > col.height - CRACKS.depth) return BLOCK.EMBER_CRACK;
-    if (col.sand) return y > col.height - SAND.depth ? BLOCK.SAND : ROCK;
+    if (col.sand) return y > col.height - SAND.depth ? LOWLAND : ROCK;
     if (y === col.height) return SURFACE;
     if (y >= col.height - T.dirtDepth) return UNDER_SURFACE;
     return ROCK;

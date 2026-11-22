@@ -39,14 +39,16 @@ class Tile {
 
   // Wraps around the edges, so cracks and streaks continue on the other side
   // and the texture repeats without visible seams.
-  set(x, y, [r, g, b]) {
+  // alpha: 255 = solid (the usual), smaller = see-through (only 'crystal'
+  // blocks show this in the world; pixels never set are fully see-through).
+  set(x, y, [r, g, b], alpha = 255) {
     x = ((x % TILE) + TILE) % TILE;
     y = ((y % TILE) + TILE) % TILE;
     const i = (y * TILE + x) * 4;
     this.pixels[i] = r;
     this.pixels[i + 1] = g;
     this.pixels[i + 2] = b;
-    this.pixels[i + 3] = 255;
+    this.pixels[i + 3] = alpha;
   }
 
   get(x, y) {
@@ -434,6 +436,79 @@ function paintEmberCrack(t, rand) {
   }
 }
 
+function paintSnow(t, rand) {
+  // Soft white snow: gentle blue-grey shadows in little drifts, and a few
+  // bright sparkles where the light catches it.
+  const c = C.snow;
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, c.base));
+  }
+  // Drifts: short soft shadow lines, slightly wavy.
+  for (const row of [4, 11]) {
+    let y = row;
+    const start = Math.floor(rand() * TILE);
+    for (let k = 0; k < 6; k++) {
+      if (rand() < 0.3) y += rand() < 0.5 ? -1 : 1;
+      t.set(start + k, y, c.shadow);
+    }
+  }
+  for (let i = 0; i < 5; i++) t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), c.sparkle);
+}
+
+function paintPackedIce(t, rand) {
+  // Blue ice, packed hard: cloudy darker patches and pale cracks running
+  // across it that join up from block to block.
+  const c = C.packedIce;
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) t.set(x, y, pick(rand, c.base));
+  }
+  for (let i = 0; i < 4; i++) {
+    const x = Math.floor(rand() * TILE);
+    const y = Math.floor(rand() * TILE);
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1], [2, 1]]) t.set(x + dx, y + dy, c.deep);
+  }
+  // Cracks: a few wandering lines, each a step at a time.
+  for (let n = 0; n < 3; n++) {
+    let x = Math.floor(rand() * TILE);
+    let y = Math.floor(rand() * TILE);
+    const dx = rand() < 0.5 ? 1 : -1;
+    for (let k = 0; k < 9; k++) {
+      t.set(x, y, c.crack);
+      if (rand() < 0.5) x += dx; else y += 1;
+    }
+  }
+}
+
+function paintCrystalIce(t, rand) {
+  // Glowing crystal: see-through blue-white, with brighter facet lines
+  // running diagonally (like the flat faces of a crystal catching the light)
+  // and a thin brighter rim, so a cluster shows its block edges.
+  const c = C.crystalIce;
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) {
+      const rim = x === 0 || y === 0 || x === TILE - 1 || y === TILE - 1;
+      const facet = (x + y) % 7 === 0 || (x - y + TILE) % 11 === 0;
+      if (rim) t.set(x, y, c.edge, 225);
+      else if (facet) t.set(x, y, c.facet, 210);
+      else t.set(x, y, pick(rand, c.base), 120);
+    }
+  }
+  for (let i = 0; i < 4; i++) t.set(1 + Math.floor(rand() * 14), 1 + Math.floor(rand() * 14), c.sparkle, 255);
+}
+
+function paintCloudIce(t, rand) {
+  // Pale frosted ice, almost white: soft swirls of frost (like a frozen
+  // cloud) with a hint of blue in the hollows.
+  const c = C.cloudIce;
+  for (let y = 0; y < TILE; y++) {
+    for (let x = 0; x < TILE; x++) {
+      const swirl = Math.sin(x * 0.8 + Math.sin(y * 0.6) * 2.2) + Math.sin(y * 0.7 - x * 0.4);
+      t.set(x, y, swirl > 1.0 ? c.frost : swirl < -1.1 ? c.hollow : pick(rand, c.base));
+    }
+  }
+  for (let i = 0; i < 4; i++) t.set(Math.floor(rand() * TILE), Math.floor(rand() * TILE), c.frost);
+}
+
 const PAINTERS = {
   grass_top: paintGrassTop,
   grass_side: paintGrassSide,
@@ -453,6 +528,10 @@ const PAINTERS = {
   water: paintWater,
   black_glass: paintBlackGlass,
   ember_crack: paintEmberCrack,
+  snow: paintSnow,
+  packed_ice: paintPackedIce,
+  crystal_ice: paintCrystalIce,
+  cloud_ice: paintCloudIce,
 };
 const TILE_NAMES = Object.keys(PAINTERS);
 

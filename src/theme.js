@@ -19,7 +19,7 @@ export const THEME = {
   //   timeSlip: how much faster time passes at home while you're here. Planets
   //            closer to the black hole have a bigger slip (1 = none).
   //   color:   its dot on the ship's star map (the planet picker)
-  //   orbit:   which ring it's on in the star map (1 = closest to the black hole)
+  //   orbit:   which ring it's on in the star map (1 = closest to the black hole, 4 = furthest)
   //   seed:    the number its terrain grows from. Changing it gives a brand new
   //            world (and the old save for that planet no longer lines up).
   //   changes: settings that are DIFFERENT from home. Anything you put here
@@ -33,7 +33,7 @@ export const THEME = {
       description: 'Golden meadows, tiered forests and deep caves.',
       timeSlip: 1,
       color: '#9fc0d0',
-      orbit: 3,
+      orbit: 4,
       seed: 12345,
       changes: {},
     },
@@ -151,6 +151,85 @@ export const THEME = {
         ui: { '--page-bg': '#3a0e0a' },
       },
     },
+    ice: {
+      name: 'Hoarveil',
+      description: 'Snowfields and glowing crystal under shelves of frozen cloud.',
+      timeSlip: 4,
+      color: '#cfeeff',
+      orbit: 3,
+      seed: 9090,
+      changes: {
+        // Rolling snow fields, blue ice in the hollows, deep narrow crevasses,
+        // clusters of glowing crystal, and frozen clouds floating high above.
+        terrain: {
+          baseHeight: 46,
+          hillHeight: 9,
+          caves: false,
+          spawnOn: 'snow',
+          shipOn: 'snow',  // the rocket only parks on snow
+          blocks: { surface: 'snow', underSurface: 'snow', rock: 'packed ice' },
+          // The low patches (sand at home) are cracked blue ice here.
+          sand: { block: 'packed ice', maxHeight: 43, patchScale: 0.05, threshold: 0.0, lowlandBonus: 0.15, depth: 2 },
+          crevasses: {
+            scale: 0.018,   // smaller = longer, straighter crevasses, further apart
+            width: 0.03,    // bigger = wider (they're narrowest at the bottom)
+            depth: 14,      // blocks deep in the middle
+            gaps: -0.25,    // -1 to 1: bigger = shorter crevasses with more ground between them
+          },
+          crystals: {
+            cell: 26,         // one cluster at most in each square this many blocks across
+            chance: 0.6,      // share of squares that get one
+            radius: 2.5,      // how far the cluster spreads, in blocks
+            height: [2.5, 5], // the tallest shard (random between these)
+            gaps: 0.35,       // share of spots in the cluster left without a shard
+          },
+          frozenClouds: {
+            cell: 44,          // one shelf at most in each square this many blocks across
+            chance: 0.8,       // share of squares that get one
+            radius: [10, 18],  // half-width of the oval, each way (random between these)
+            above: [22, 32],   // how far the top is above the ground under its middle
+            thickness: 2,      // extra thickness in the middle (the edges are 1 block thick)
+            lumps: 2,          // how lumpy the underside is
+            icicles: 0.035,    // share of spots with an icicle hanging under them
+            icicleLength: [2, 5],
+            wobble: 0.35,      // how wobbly the edge is (0 = a perfect oval)
+            minClearance: 12,  // never closer to the ground than this
+          },
+        },
+        trees: { chance: 0 },
+
+        // Pale icy white-blue days, cold blue dusks, very dark blue nights.
+        skyKeyframes: [
+          { hour: 4,  name: 'night',   sky: '#0a1430', skyTop: '#02040c', light: '#9fb8e8', lightStrength: 0.4,  ambientSky: '#34508a', ambientGround: '#1a2238', ambientStrength: 0.5,  cloudLit: '#1e2c50', cloudShade: '#0c1428', stars: 1 },
+          { hour: 5,  name: 'dawn',    sky: '#3e5080', skyTop: '#121c44', light: '#a8b8e0', lightStrength: 0.5,  ambientSky: '#6a7aa8', ambientGround: '#2a3040', ambientStrength: 0.55, cloudLit: '#9aaad4', cloudShade: '#3a4870', stars: 0.5 },
+          { hour: 6,  name: 'sunrise', sky: '#d0d4ea', skyTop: '#7898c8', light: '#ece6f2', lightStrength: 0.85, ambientSky: '#e0e6f6', ambientGround: '#a4aec8', ambientStrength: 0.8,  cloudLit: '#f2f0f8', cloudShade: '#a8b4d8', stars: 0 },
+          { hour: 8,  name: 'day',     sky: '#dde9f3', skyTop: '#9fc2e2', light: '#eef3ff', lightStrength: 1.35, ambientSky: '#ffffff', ambientGround: '#c4d0e4', ambientStrength: 1.2,  cloudLit: '#ffffff', cloudShade: '#c6d4e6', stars: 0 },
+          { hour: 18, name: 'day',     sky: '#dde9f3', skyTop: '#9fc2e2', light: '#eef3ff', lightStrength: 1.35, ambientSky: '#ffffff', ambientGround: '#c4d0e4', ambientStrength: 1.2,  cloudLit: '#ffffff', cloudShade: '#c6d4e6', stars: 0 },
+          { hour: 19.5, name: 'sunset', sky: '#b8c0e0', skyTop: '#5c78b0', light: '#d4cef0', lightStrength: 0.8, ambientSky: '#c8d2ee', ambientGround: '#8c96b8', ambientStrength: 0.75, cloudLit: '#e4e2f4', cloudShade: '#8494c4', stars: 0 },
+          { hour: 21, name: 'dusk',    sky: '#22427a', skyTop: '#0a1638', light: '#7a9ad8', lightStrength: 0.45, ambientSky: '#4a68a8', ambientGround: '#1c2440', ambientStrength: 0.5,  cloudLit: '#4a6aa0', cloudShade: '#1a2a50', stars: 0.6 },
+          { hour: 22, name: 'night',   sky: '#0a1430', skyTop: '#02040c', light: '#9fb8e8', lightStrength: 0.4,  ambientSky: '#34508a', ambientGround: '#1a2238', ambientStrength: 0.5,  cloudLit: '#1e2c50', cloudShade: '#0c1428', stars: 1 },
+        ],
+        clouds: { coverage: 0.32, size: 1.0, softness: 0.3 }, // light and wispy
+        starfield: { density: 2.2, galaxyBand: 0.5 },         // lots of stars
+
+        // A weak, pale sun (and an even fainter second one).
+        suns: [
+          { size: 26, core: '#f4f8ff', rim: '#d6e4f4', glow: '#e2ecf8', lag: 0, tilt: 0 },
+          { size: 12, core: '#eef6ff', rim: '#b8d4f0', glow: '#cfe2f6', lag: 0.16, tilt: 0.12 },
+        ],
+
+        // The crystal ice casts a faint cold blue glow on the snow around it.
+        glowLight: { color: '#7fd8ff', strength: 1.0, reach: 5 },
+
+        // Snow, not dust, puffs up when the rocket lands and takes off.
+        ship: { smoke: '#f4f8ff' },
+
+        // Between the lava planet and home: a medium-small black hole.
+        blackHole: { size: 7 }, // black centre 14 degrees across, about 18 with its ring
+
+        ui: { '--page-bg': '#dde9f3' },
+      },
+    },
   },
 
   // ---- Terrain shape (logic in terrain.js) ----
@@ -174,6 +253,13 @@ export const THEME = {
     // depth (how many blocks down the glow goes).
     cracks: null,
 
+    // Ice planet features (null = none). Every setting is explained on the
+    // ice planet in THEME.planets above.
+    crevasses: null,     // deep narrow cracks in the ground
+    crystals: null,      // clusters of glowing crystal ice
+    frozenClouds: null,  // shelves of ice floating high above the ground
+    shipOn: null,        // block name the rocket must park on (null = any dry ground)
+
     // Sea: every gap between the ground and this height is filled with water.
     // 0 = no sea at all.
     seaLevel: 0,
@@ -186,6 +272,7 @@ export const THEME = {
     // like dried-up ponds. A column is sand if it's low enough AND its "sand
     // noise" (a seeded pattern of blobs) plus a bonus for being extra low is high enough.
     sand: {
+      block: 'sand',      // which block the patches are made of
       maxHeight: 45,      // ground must be at or below this height
       patchScale: 0.06,   // smaller = bigger, smoother patches
       threshold: 0.15,    // -1 to 1. Bigger = fewer, smaller patches; -1 = every low spot
@@ -455,7 +542,8 @@ export const THEME = {
     beacon: '#ff4a3a',     // blinking light on the nose (glows)
     flame: '#ff7a20',      // engine flame during takeoff and landing
     flameCore: '#fff0b0',  // its white-hot middle
-    smoke: '#d8d2c6',      // smoke and dust puffs at the base
+    smoke: '#d8d2c6',      // smoke and dust puffs at the base (each planet can set
+                           // its own in THEME.planets: snow-white on the ice planet)
   },
 
   // ---- Item pictures (see itemIcons.js for the patterns) ----
@@ -622,6 +710,28 @@ export const THEME = {
       edge: '#b8380e',     // cooler dark red swirls
       core: '#ffd36a',     // white-hot spots
       crust: ['#1a1418', '#2a1a16'], // flakes of black crust floating on it
+    },
+    // ---- Ice planet blocks ----
+    snow: {                // soft white snow
+      base: ['#e4ebf2', '#dde5ee', '#e8eef5', '#e0e8f0'],
+      shadow: '#c3cfe0',   // little drift shadows
+      sparkle: '#ffffff',
+    },
+    packedIce: {           // cracked blue packed ice
+      base: ['#7fb0dc', '#78a9d6', '#86b6e0', '#7badd9'],
+      deep: '#5e90c4',     // cloudy darker patches
+      crack: '#d4ebff',    // pale cracks
+    },
+    crystalIce: {          // glowing see-through crystal (always lit, even at night)
+      base: ['#8fe8ff', '#9ef0ff', '#86def8'],
+      facet: '#d8fbff',    // the bright lines across each face
+      edge: '#bdf6ff',     // the thin rim round each block
+      sparkle: '#ffffff',
+    },
+    cloudIce: {            // pale frosted ice the frozen clouds are made of
+      base: ['#e8f0f8', '#e2ecf6', '#edf3fa'],
+      frost: '#fafcff',    // bright frost swirls
+      hollow: '#c8d8ec',   // faint blue in the hollows
     },
     // ---- Water (only on planets with a sea) ----
     water: {               // shallow teal sea with soft ripples (how see-through: waterOpacity)

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { THEME } from './theme.js';
-import { BLOCK } from './blocks.js';
+import { BLOCK, BLOCK_TYPES } from './blocks.js';
 import { CUBE, MATERIAL, GLOW_MATERIAL } from './mobModel.js';
 import { CHUNK_SIZE } from './world.js';
 
@@ -201,12 +201,15 @@ function toWorldColumn(point, origin, turns) {
 
 // Pick the ship's landing spot near block column `near` (where you start).
 // It must be dry ground (an island on the water world), with no trees, no
-// cave holes and nothing you've built. Flat ground wins; then about 9 blocks
+// cave holes or crevasses, no crystals, no frozen cloud overhead (so it can
+// fly straight up and down) and nothing you've built. On planets with a
+// `shipOn` block (theme.js terrain), only on that block (snow on the ice planet). Flat ground wins; then about 9 blocks
 // away, with the ramp facing you. Only uses the terrain and the save, so it
 // can be worked out before any land is loaded, and it's the same every time
 // (unless you build on the spot: then it lands somewhere else next time).
 export function chooseShipSite(terrain, editStore, near) {
   const seaLevel = THEME.terrain.seaLevel;
+  const shipOn = THEME.terrain.shipOn ? BLOCK_TYPES.findIndex((type) => type.name === THEME.terrain.shipOn) : null;
 
   // Columns you've changed anything in, near the start.
   const edited = new Set();
@@ -229,8 +232,9 @@ export function chooseShipSite(terrain, editStore, near) {
     const col = terrain.column(x, z);
     const top = terrain.blockInColumn(x, col.height, z, col);
     const ok = (!seaLevel || col.height > seaLevel) && // dry
-      top !== BLOCK.AIR && top !== BLOCK.WATER &&      // not a cave hole
-      !col.tree && !edited.has(key);
+      top !== BLOCK.AIR && top !== BLOCK.WATER &&      // not a cave hole or crevasse
+      (shipOn === null || top === shipOn) &&
+      !col.tree && !col.crystal && !col.cloud && !edited.has(key);
     const result = ok ? col.height : null;
     groundCache.set(key, result);
     return result;

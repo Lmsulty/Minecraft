@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { THEME } from './theme.js';
 import { BLOCK } from './blocks.js';
 import { travelTo } from './planets.js';
-import { pickLine } from './kevinBrain.js';
+import { pickLine, hasLines } from './kevinBrain.js';
 
 // ==========================================================
 //  CUTSCENES: the rocket taking off and landing (step 5).
@@ -54,6 +54,9 @@ const CAMERA_DISTANCE = 18;            // blocks from the rocket (tries a few ne
 const CAMERA_DIRECTIONS = 16;          // directions tried around the rocket
 const CAMERA_EYE = 1.6;                // height above the ground at its spot
 const LOOK_HEIGHT = 5;                 // aims this far up the rocket (its middle)
+const SKY_CHECKS = [0.25, 0.5, 0.75, 1]; // spots up the landing path (shares of DROP_HEIGHT) that
+                                         // the camera should see, so a frozen cloud (ice planet)
+                                         // doesn't hide the rocket on its way down
 const SHAKE_IGNITION = 0.06;           // camera shake while the engine fires on the ground (blocks)
 const SHAKE_TOUCHDOWN = 0.12;          // ...and at touchdown
 const SHAKE_FADE = 0.4;                // the touchdown shake dies away over this long
@@ -186,10 +189,12 @@ export class Cutscene {
   // ---- Where the camera watches from ----
   // A spot about CAMERA_DISTANCE blocks to the side of the rocket, on dry
   // ground, with a clear view of it, base and all (so you see the smoke and
-  // dust). Lower spots win, so the rocket looks big. If nowhere can see the
-  // base, a clear view of its middle will do.
+  // dust), and of its whole path up into the sky (nothing like a frozen cloud
+  // in the way). Lower spots win, so the rocket looks big. If nowhere can see
+  // all that, it gives up the sky view first, then the base.
   findCameraSpot() {
-    return this.searchCameraSpot(true) ?? this.searchCameraSpot(false) ?? this.fallbackSpot();
+    return this.searchCameraSpot(true, true) ?? this.searchCameraSpot(true, false) ??
+      this.searchCameraSpot(false, false) ?? this.fallbackSpot();
   }
 
   fallbackSpot() {
@@ -198,10 +203,11 @@ export class Cutscene {
     return new THREE.Vector3(origin.x + CAMERA_DISTANCE, origin.y + 4, origin.z);
   }
 
-  searchCameraSpot(needBase) {
+  searchCameraSpot(needBase, needSky) {
     const { origin } = this.ship.site;
     const target = new THREE.Vector3(origin.x, origin.y + LOOK_HEIGHT, origin.z);
     const base = new THREE.Vector3(origin.x, origin.y + 0.6, origin.z);
+    const sky = SKY_CHECKS.map((share) => target.clone().setY(target.y + DROP_HEIGHT * share));
     const world = this.world;
     let best = null;
     for (const distance of [CAMERA_DISTANCE, CAMERA_DISTANCE - 3, CAMERA_DISTANCE + 4, CAMERA_DISTANCE - 6]) {
@@ -210,13 +216,15 @@ export class Cutscene {
         const x = origin.x + Math.cos(angle) * distance;
         const z = origin.z + Math.sin(angle) * distance;
         if (!world.isLoadedAt(x, z)) continue;
-        const ground = world.getSurfaceY(Math.floor(x), Math.floor(z));
+        // The real ground (on the ice planet, not the top of a frozen cloud).
+        const ground = world.getGroundY(Math.floor(x), Math.floor(z));
         const under = world.getBlock(x, ground - 1, z);
         if (under === BLOCK.WATER || under === BLOCK.SHIP_HULL) continue;
         if (world.getBlock(x, ground, z) === BLOCK.WATER) continue; // standing in the sea
         const eye = new THREE.Vector3(x, ground + CAMERA_EYE, z);
         if (!this.canSee(eye, target)) continue;
         if (needBase && !this.canSee(eye, base)) continue;
+        if (needSky && !sky.every((spot) => this.canSee(eye, spot))) continue;
         const score = (eye.y - origin.y) + Math.abs(distance - CAMERA_DISTANCE) * 0.3;
         if (!best || score < best.score) best = { score, eye };
       }
@@ -225,11 +233,12 @@ export class Cutscene {
     return best?.eye ?? null;
   }
 
-  // Is the straight line from a to b clear of the ground (and trees)?
+  // Is the straight line from a to b clear of the ground (and trees, and
+  // frozen clouds)? Checked every half block, so even a thin cloud is caught.
   canSee(a, b) {
-    const steps = 30;
+    const steps = Math.max(30, Math.ceil(a.distanceTo(b) * 2));
     const p = new THREE.Vector3();
-    for (let i = 1; i < steps - 3; i++) { // stop short of the rocket itself
+    for (let i = 1; i < steps * 0.9; i++) { // stop short of the rocket itself
       p.lerpVectors(a, b, i / steps);
       if (this.world.isSolid(p.x, p.y, p.z) && this.world.getBlock(p.x, p.y, p.z) !== BLOCK.SHIP_HULL) return false;
     }
@@ -383,10 +392,13 @@ export class Cutscene {
     dome.holeSize.value = this.baseHoleSize * (1 + HOLE_GROWTH * dark);
   }
 
+  // Kevin's line as the door opens. A planet can have its own lines in
+  // kevinBrain.js, called "landing" + its name (e.g. landingIce for `ice`).
   landingLine() {
     const planet = THEME.planets[THEME.planet];
     if (planet.timeSlip <= 1) return pickLine('landingHome');
-    return pickLine('landing', 0, { planet: planet.name, slip: slipWords(planet.timeSlip) });
+    const own = 'landing' + THEME.planet[0].toUpperCase() + THEME.planet.slice(1);
+    return pickLine(hasLines(own) ? own : 'landing', 0, { planet: planet.name, slip: slipWords(planet.timeSlip) });
   }
 
   // ---- Ending ----

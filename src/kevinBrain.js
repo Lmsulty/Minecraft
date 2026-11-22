@@ -46,6 +46,16 @@ const LINES = {
     '{planet}, as promised. I\'d avoid dawdling. Home is ageing {slip} a minute.',
   ],
 
+  // Landing on the ice planet (cutscene.js: a planet's own landing lines are
+  // called "landing" + its name in THEME.planets, e.g. landingIce for `ice`).
+  landingIce: [
+    '{planet}. Bracing. Home ages {slip} for every minute we stand here shivering.',
+    'Touchdown. If my joints freeze solid, I want it known I was against this.',
+    'Lovely. A planet-sized freezer. Mind the time slip: {slip} at home per minute.',
+    'Don\'t lick anything. Also, home is ageing {slip} a minute. Mostly the licking, though.',
+    'I\'d complain about the cold, but my complaints would freeze on the way out.',
+  ],
+
   // Landing back home.
   landingHome: [
     'Home again. Everything\'s a little older than we left it. Except me.',
@@ -424,6 +434,11 @@ const recent = {};       // kind -> the last few lines used
 // A line of this kind, not one used recently. `count` fills in {count},
 // and `fill` fills in anything else, e.g. { block: 'planks' } -> {block}.
 // Returns { text, mood }.
+// Are there any lines of this kind? (e.g. a planet's own landing lines)
+export function hasLines(kind) {
+  return !!LINES[kind];
+}
+
 export function pickLine(kind, count = 0, fill = {}) {
   const lines = LINES[kind] ?? LINES.unknown;
   const used = (recent[kind] ??= []);

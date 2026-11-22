@@ -24,6 +24,11 @@ export const BLOCK = {
   EMBER_CRACK: 15,
   // Invisible, fills the spaceship's shape (ship.js). Never saved.
   SHIP_HULL: 16,
+  // Made by the world on the ice planet:
+  SNOW: 17,
+  PACKED_ICE: 18,
+  CRYSTAL_ICE: 19,
+  CLOUD_ICE: 20,  // the frozen cloud shelves floating high above the ground
 };
 
 // Indexed by block id.
@@ -34,6 +39,8 @@ export const BLOCK = {
 //               'cutout' = some pixels are fully see-through (e.g. gaps between leaves, glass).
 //               'glow'   = always fully bright, even at night (e.g. the glow lamp).
 //               'water'  = see-through all over (how much: THEME.waterOpacity).
+//               'crystal' = see-through all over (each pixel has its own
+//                          see-through-ness) AND always bright, even at night.
 // - blocksLight: does it stop sunlight from spreading into caves? (leaves let light through)
 // - breakable:  can the player break it? (missing = yes)
 // - drops:      which block you collect when you break it (missing = the block itself)
@@ -127,6 +134,30 @@ export const BLOCK_TYPES = [
     // it doesn't block sunlight. No textures = can't be carried or placed.
     id: BLOCK.SHIP_HULL, name: 'ship hull', solid: true, opaque: false, blocksLight: false,
     breakable: false,
+  },
+  {
+    // The ice planet's ground: soft, rolling snow.
+    id: BLOCK.SNOW, name: 'snow', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
+    textures: { top: 'snow', side: 'snow', bottom: 'snow' },
+  },
+  {
+    // Cracked blue ice, in the ice planet's low ground and deep down.
+    id: BLOCK.PACKED_ICE, name: 'packed ice', solid: true, opaque: true, renderType: 'opaque', blocksLight: true,
+    textures: { top: 'packed_ice', side: 'packed_ice', bottom: 'packed_ice' },
+  },
+  {
+    // Glowing crystal ice: see-through like glass, always faintly lit, and it
+    // lights up the ground around it at night (like the lava planet's cracks).
+    id: BLOCK.CRYSTAL_ICE, name: 'crystal ice', solid: true, opaque: false, renderType: 'crystal', blocksLight: false,
+    emitsLight: true,
+    textures: { top: 'crystal_ice', side: 'crystal_ice', bottom: 'crystal_ice' },
+  },
+  {
+    // Pale frosted ice: what the frozen clouds are made of. Solid, so you can
+    // build up and walk on them. Lets sunlight through, so the ground
+    // underneath doesn't go cave-dark.
+    id: BLOCK.CLOUD_ICE, name: 'cloud ice', solid: true, opaque: true, renderType: 'opaque', blocksLight: false,
+    textures: { top: 'cloud_ice', side: 'cloud_ice', bottom: 'cloud_ice' },
   },
 ];
 

@@ -167,6 +167,23 @@ export class World {
     return 0;
   }
 
+  // Like getSurfaceY, but looks through the ice planet's frozen clouds (and
+  // anything built on top of them) to the real ground underneath. Used to
+  // tell whether something is "under cover", and where the cutscene camera
+  // stands. Anywhere without a frozen cloud overhead, it's the same as getSurfaceY.
+  getGroundY(x, z) {
+    // Start just under the lowest frozen cloud block in this column (if any)...
+    let from = WORLD_HEIGHT - 1;
+    for (let y = WORLD_HEIGHT - 1; y >= 0; y--) {
+      if (this.getBlock(x, y, z) === BLOCK.CLOUD_ICE) from = y - 1;
+    }
+    // ...then go down to the first solid block.
+    for (let y = from; y >= 0; y--) {
+      if (this.isSolid(x, y, z)) return y + 1;
+    }
+    return 0;
+  }
+
   // ---- Changing blocks ----
 
   // Change one block, remember the change, and redraw only the chunks that
