@@ -10,6 +10,12 @@ import { facing, wantedSpot, at, shapeOf, structure, MAIN } from './kevinBluepri
 //        most 1 block), he uses as it is
 //      - otherwise he takes the nearest one he could clear: ground bumps of
 //        at most 2 blocks, and nothing of YOURS in the way
+//    If getting a spot ready the normal way would touch YOUR blocks (e.g.
+//    it's on a platform you built: a hut's floor replaces the top layer of
+//    ground, and levelling digs off bumps), he builds ON TOP instead: the
+//    build sits on the highest ground under it, nothing is levelled, and a
+//    hut gets its own floor in the layer above your blocks. Then he only
+//    refuses if your blocks are where the walls, roof or inside would go.
 // 2. Clearing: he removes the NATURAL blocks where the build goes (ground,
 //    stone, sand, trees...), levelling the ground. Touch any part of a tree
 //    and he takes the whole tree, trunk and all its leaves, so nothing is
@@ -69,10 +75,20 @@ export function wholeTree(world, x, y, z) {
   return blocks;
 }
 
-// Could it go with its front-middle at column (x, z)? Returns
-//   { ok: true, start, clear, foundation, alreadyClear }  or
-//   { ok: false, yours }  (yours = one of your blocks is in the way)
+// Could it go with its front-middle at column (x, z)? Tries the normal way
+// first; if that would touch your blocks, tries building on top of them.
+// Returns { ok: true, start, clear, foundation, alreadyClear }  or
+//         { ok: false, yours }  (yours = one of your blocks is in the way)
 function checkSpot(kind, shape, world, player, dir, x, z, nearY) {
+  const normal = checkSpotWay(shape, world, player, dir, x, z, nearY, false);
+  return normal.yours ? checkSpotWay(shape, world, player, dir, x, z, nearY, true) : normal;
+}
+
+// One way of fitting it in. onTop = false: the normal way (level the ground
+// to its most common height; a hut's floor replaces the top layer).
+// onTop = true: sit the whole build above the highest ground under it, so
+// nothing in the ground is touched; only the space the build fills is checked.
+function checkSpotWay(shape, world, player, dir, x, z, nearY, onTop) {
   const p = player.position;
   const columns = shape.columns.map(([along, side]) => at({ x, y: 0, z }, dir, along, side, 0));
 
@@ -89,13 +105,20 @@ function checkSpot(kind, shape, world, player, dir, x, z, nearY) {
   const highest = Math.max(...levels);
   if (highest - lowest > MAX_BUMP) return { ok: false };
 
-  // Build at the most common ground level (ties: the higher one), so he
-  // digs off the odd bump and fills the odd dip.
-  const counts = new Map();
-  for (const level of levels) counts.set(level, (counts.get(level) ?? 0) + 1);
-  let base = lowest;
-  for (const [level, n] of counts) {
-    if (n > counts.get(base) || (n === counts.get(base) && level > base)) base = level;
+  // Normal: build at the most common ground level (ties: the higher one), so
+  // he digs off the odd bump and fills the odd dip.
+  // On top: the lowest layer of the build (a hut's floor) goes in the first
+  // empty layer above the highest ground, so nothing in the ground is dug.
+  let base;
+  if (onTop) {
+    base = highest - shape.bottom;
+  } else {
+    const counts = new Map();
+    for (const level of levels) counts.set(level, (counts.get(level) ?? 0) + 1);
+    base = lowest;
+    for (const [level, n] of counts) {
+      if (n > counts.get(base) || (n === counts.get(base) && level > base)) base = level;
+    }
   }
 
   // What's in the space it fills: must be air, or natural blocks he can clear.
@@ -106,7 +129,7 @@ function checkSpot(kind, shape, world, player, dir, x, z, nearY) {
       const y = base + up;
       const id = world.getBlock(c.x, y, c.z);
       if (id === BLOCK.AIR) continue;
-      if (!world.isNatural(c.x, y, c.z)) return { ok: false, yours: true };
+      if (!world.isNatural(c.x, y, c.z)) return { ok: false, yours: true }; // never touches your blocks
       if (!isBreakableId(id)) return { ok: false };
       clear.push({ x: c.x, y, z: c.z, id });
       if (up >= 0) inTheWay++;
