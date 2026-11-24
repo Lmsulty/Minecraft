@@ -835,6 +835,15 @@ export const THEME = {
     '--map-launch-text': '#1a0c04',
     '--map-launch-off-bg': 'rgba(255, 255, 255, 0.1)', // ...greyed out ("YOU ARE HERE")
     '--map-launch-off-text': 'rgba(255, 255, 255, 0.45)',
+    // The time slip readout in the corner, away from home (timeSlip.js)
+    '--clock-bg': 'rgba(8, 16, 22, 0.72)',
+    '--clock-border': 'rgba(127, 245, 232, 0.35)',
+    '--clock-glow': 'rgba(127, 245, 232, 0.12)',  // faint glow round the panel
+    '--clock-scanline': 'rgba(127, 245, 232, 0.04)', // faint screen lines across it
+    '--clock-label': 'rgba(127, 245, 232, 0.7)',  // "SHIP", "HOME"
+    '--clock-text': '#e8f4f2',                    // ship time
+    '--clock-home': '#ffd27a',                    // home time (racing ahead) and its blinking light
+    '--clock-slip': 'rgba(255, 210, 122, 0.7)',   // "TIME SLIP ×60"
   },
 };
 

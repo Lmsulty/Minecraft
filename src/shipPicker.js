@@ -43,8 +43,10 @@ export class ShipPicker {
   // player: the Player (where you are, and freeing/recapturing the mouse)
   // door:   the block column { x, z } at the foot of the ship's ramp
   // onPick: called with the chosen planet's name (starts the takeoff, cutscene.js)
-  constructor(hint, root, player, door, onPick) {
+  // timeSlip: the ship and home clocks (timeSlip.js), shown in the info panel
+  constructor(hint, root, player, door, onPick, timeSlip) {
     this.onPick = onPick;
+    this.timeSlip = timeSlip;
     this.hint = hint;
     this.root = root;
     this.player = player;
@@ -121,6 +123,7 @@ export class ShipPicker {
     this.planetEls = new Map([...this.root.querySelectorAll('.map-planet')].map((el) => [el.dataset.planet, el]));
     this.orbitEls = new Map([...this.root.querySelectorAll('.map-orbit')].map((el) => [el.dataset.orbit, el]));
     this.launchButton = this.root.querySelector('.map-launch');
+    [this.shipClockEl, this.homeClockEl] = this.root.querySelectorAll('.map-clock-value');
 
     // Hover or click a planet: select it. LAUNCH: go there.
     for (const [name, el] of this.planetEls) {
@@ -130,6 +133,13 @@ export class ShipPicker {
     this.launchButton.addEventListener('click', () => this.launch());
     this.select(this.selected);
     this.placePlanets();
+    this.showClocks();
+  }
+
+  // SHIP TIME and HOME TIME: this trip so far ("Ready" at home, with no trip running).
+  showClocks() {
+    this.shipClockEl.textContent = this.timeSlip.shipText();
+    this.homeClockEl.textContent = this.timeSlip.homeText();
   }
 
   // Show planet `name` in the info panel, and light it up on the map.
@@ -166,6 +176,7 @@ export class ShipPicker {
       this.time += Math.min(0.1, (now - last) / 1000);
       last = now;
       this.placePlanets();
+      this.showClocks();
       requestAnimationFrame(step);
     };
     requestAnimationFrame(step);

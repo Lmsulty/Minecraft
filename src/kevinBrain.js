@@ -63,6 +63,26 @@ const LINES = {
     'Home. The time slip has had its fun with us, I expect.',
   ],
 
+  // Landing back home after a trip (cutscene.js, timeSlip.js).
+  // {away} = how long we were gone (real time), {aged} = how much home aged.
+  // (Both come out lowercase, e.g. "four minutes", so don't start a sentence with them.)
+  backHome: [
+    'We were gone {away}. Home aged {aged}. Lovely.',
+    'Home. That was {away} for us and {aged} for everyone else. Try not to think about it.',
+    'Back again. The ship clock says {away}, the home one says {aged}. I\'ve stopped asking why.',
+    'Touchdown. Home aged {aged} while we popped out for {away}. Nobody waited up.',
+  ],
+
+  // Every so often on a planet with a big time slip (timeSlip.js).
+  // {away} = how long this trip has been, {aged} = how much home has aged since we left.
+  slipWarning: [
+    'Friendly reminder: we\'ve been out {away}. Home has aged {aged}.',
+    'Home is {aged} older than when we left. Just thought you should know. Tick tock.',
+    'Every minute we spend here, home gets older. Currently {aged} older. No pressure.',
+    'I\'ve been watching the home clock. It says {aged} and it isn\'t slowing down.',
+    'We\'ve been gone {away}, which back home is {aged}. I\'m only saying.',
+  ],
+
   // Every so often, when nothing's happening (daytime).
   idle: [
     'Lovely day for it. Whatever "it" is.',

@@ -203,7 +203,12 @@
   letter-spacing: 0.2em;
 }
 .map-clock-value {
-  font: 600 18px ui-monospace, monospace;
+  font: 600 16px ui-monospace, monospace;
+  white-space: nowrap;
+}
+/* HOME TIME ("+5 weeks 3 days") is longer than SHIP TIME, so it gets more room */
+.map-clock:last-child {
+  flex: 1.6;
 }
 .map-launch {
   margin-top: 8px;

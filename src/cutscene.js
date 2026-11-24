@@ -109,7 +109,9 @@ function slipWords(slip) {
 
 export class Cutscene {
   // opts: { scene, camera, player, kevin, talk, ship, world, dayNight, getHaze,
-  //         fade, skipHint, cover (index.html's black arrival cover), stepOut }
+  //         fade, skipHint, cover (index.html's black arrival cover), stepOut,
+  //         timeSlip (the trip clocks: started on takeoff from home, and
+  //         Kevin's "home aged..." line when you land back) }
   constructor(opts) {
     Object.assign(this, opts);
     this.active = null; // 'takeoff', 'landing' or null
@@ -248,6 +250,8 @@ export class Cutscene {
   // ---- Starting ----
   takeoff(planetName) {
     this.planetName = planetName;
+    // Leaving home: a new trip starts, both time slip clocks at zero (timeSlip.js).
+    if (THEME.planet === 'home') this.timeSlip?.startTrip();
     this.start('takeoff');
     this.kevin.hidden = true;   // you're both aboard
     this.talk.saidHello = true; // no "hello" cutting over his takeoff line
@@ -396,7 +400,11 @@ export class Cutscene {
   // kevinBrain.js, called "landing" + its name (e.g. landingIce for `ice`).
   landingLine() {
     const planet = THEME.planets[THEME.planet];
-    if (planet.timeSlip <= 1) return pickLine('landingHome');
+    if (planet.timeSlip <= 1) {
+      // Back home: how long were we gone, and how much did home age? (timeSlip.js)
+      const trip = this.timeSlip?.endTrip();
+      return trip ? pickLine('backHome', 0, trip) : pickLine('landingHome');
+    }
     const own = 'landing' + THEME.planet[0].toUpperCase() + THEME.planet.slice(1);
     return pickLine(hasLines(own) ? own : 'landing', 0, { planet: planet.name, slip: slipWords(planet.timeSlip) });
   }

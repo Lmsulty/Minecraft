@@ -8,9 +8,10 @@ import { makeSkyDome, makeSuns, makeSkyPlanets, setSkyDetail } from './sky.js';
 // themselves are drawn in sky.js.) Press T to speed time up (and T again to go back).
 
 // ---- Timing ----
-const DAY_LENGTH_SECONDS = 360; // one full 24-hour day = 6 real minutes
-const START_HOUR = 9;           // the game starts mid-morning
-const FAST_SPEED = 20;          // speed when T is on (a whole day in ~18 seconds)
+// (Shared with timeSlip.js, which counts home time in these same days.)
+export const DAY_LENGTH_SECONDS = 360; // one full 24-hour day = 6 real minutes
+export const START_HOUR = 9;           // the game starts mid-morning
+export const FAST_SPEED = 20;          // speed when T is on (a whole day in ~18 seconds)
 const SUNRISE_HOUR = 6;         // sun crosses the horizon going up
 const SUNSET_HOUR = 20;         // sun crosses the horizon going down
 
@@ -34,6 +35,7 @@ export class DayNight {
     this.mainLight = mainLight;       // the big sun by day, starlight by night
     this.hour = START_HOUR;
     this.fast = false;
+    this.clock = null; // a function giving the hour, to follow instead of running our own (see followClock)
 
     // Theme keyframes, with colours turned into Three.js colours once up front.
     this.keyframes = THEME.skyKeyframes
@@ -84,10 +86,19 @@ export class DayNight {
     setSkyDetail(this.dome, detail);
   }
 
+  // Take the time of day from somewhere else from now on: `clock()` returns
+  // the hour (0-24). At home, that's the home clock (timeSlip.js), so the
+  // time of day carries on from where home time has got to.
+  followClock(clock) {
+    this.clock = clock;
+    this.hour = clock();
+  }
+
   // Call every frame. dt = seconds since the last frame.
   update(dt) {
     const speed = this.fast ? FAST_SPEED : 1;
-    this.hour = (this.hour + (Math.max(0, dt) * speed * 24) / DAY_LENGTH_SECONDS) % 24;
+    if (this.clock) this.hour = this.clock();
+    else this.hour = (this.hour + (Math.max(0, dt) * speed * 24) / DAY_LENGTH_SECONDS) % 24;
 
     this.dome.material.uniforms.time.value += Math.max(0, dt); // real seconds: the black hole's gas keeps swirling
     this.blendKeyframes();

@@ -16,6 +16,7 @@ import { Cutscene } from './cutscene.js';
 import { Ship, chooseShipSite } from './ship.js';
 import { ShipPicker } from './shipPicker.js';
 import { DayNight } from './dayNight.js';
+import { TimeSlip } from './timeSlip.js';
 import { Underwater } from './underwater.js';
 import { updateCurve, cullBentChunks } from './curve.js';
 import { GraphicsSettings } from './graphics.js';
@@ -83,6 +84,9 @@ const player = new Player(camera, world, renderer.domElement, document.getElemen
 
 // ---- Day/night cycle (press T to speed it up) ----
 const dayNight = new DayNight(scene, camera, ambientLight, mainLight, graphics.level);
+// ---- The time slip clocks: a trip timer, from takeoff at home to landing back (timeSlip.js) ----
+// At home, the day/night cycle follows home's own clock. Away, a readout in the corner shows the trip.
+const timeSlip = new TimeSlip(document.getElementById('time-readout'), dayNight);
 // Sea-coloured view with your head under water (underwater.js).
 const underwater = new Underwater(scene, camera, world, ambientLight, () => graphics.level.haze);
 
@@ -151,6 +155,7 @@ const kevinVoice = new KevinVoice(document.getElementById('kevin-voice'), (text)
 const kevinTalk = new KevinTalk(kevin, player, dayNight, camera,
   new KevinBubble(document.getElementById('kevin-bubble')),
   new KevinCaption(document.getElementById('kevin-caption')), kevinVoice);
+timeSlip.setTalk(kevinTalk, player); // Kevin's time slip warnings
 
 // ---- Kevin building things you ask for in the chat (kevinBuild.js) ----
 const kevinBuilder = new KevinBuilder({
@@ -195,14 +200,18 @@ const cutscene = new Cutscene({
   skipHint: document.getElementById('cutscene-skip'),
   cover: document.getElementById('arrival-cover'),
   stepOut: document.getElementById('step-out'),
+  timeSlip,
 });
-// Arrived by ship? Then the rocket comes in to land first.
+// Arrived by ship? Then the rocket comes in to land first. (Back home by
+// ship, Kevin says how much home aged as the door opens. Back home any
+// other way, e.g. the debug P key: the trip just quietly ends.)
 if (takeArrival()) cutscene.landing();
+else if (THEME.planet === 'home') timeSlip.endTrip();
 
 // ---- Boarding the ship: near its ramp, press R to pick a planet (shipPicker.js) ----
 // Picking a planet plays the takeoff, then travels there.
 const shipPicker = new ShipPicker(document.getElementById('ship-hint'),
-  document.getElementById('ship-picker'), player, shipSite.door, (name) => cutscene.takeoff(name));
+  document.getElementById('ship-picker'), player, shipSite.door, (name) => cutscene.takeoff(name), timeSlip);
 
 // ---- Debug: press P to jump to the next planet, no cutscene (switch off in planets.js) ----
 setupDebugPlanetKey(() => !!cutscene.active);
@@ -246,6 +255,10 @@ function loop(now) {
   kevinTalk.update(dt); // after Kevin moves, so his speech bubble follows him
   interaction.update();
   cutscene.update(dt);  // moves the rocket and the camera (only during a cutscene)
+  // Ship and home clocks tick, only while you're playing or in a cutscene
+  // (not paused, in the inventory or on the star map). Before dayNight,
+  // which follows home time at home.
+  timeSlip.update(dt, player.locked || !!cutscene.active);
   dayNight.update(dt); // after the player moves, so the sky is centred on the camera
   cutscene.updateSky(); // takeoff: darkens the sky (after dayNight has set its colours)
   underwater.update();  // after dayNight, which sets the haze colour every frame

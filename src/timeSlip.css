@@ -1,0 +1,84 @@
+/* ==========================================================
+   The time slip readout: two clocks in the corner while you're away from
+   home (timeSlip.js). A cockpit readout, in the star map's style.
+   COLOURS are set in src/theme.js (THEME.ui: --clock-*), not here.
+   ========================================================== */
+
+#time-readout {
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  display: none;
+  min-width: 190px;
+  padding: 8px 12px 7px;
+  border: 1px solid var(--clock-border);
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(0deg, var(--clock-scanline) 0 1px, transparent 1px 3px),
+    var(--clock-bg);
+  box-shadow: 0 0 12px var(--clock-glow), inset 0 0 10px var(--clock-glow);
+  font-family: system-ui, sans-serif;
+  pointer-events: none;
+  user-select: none;
+  z-index: 4;
+}
+#time-readout.is-shown {
+  display: block;
+}
+/* Hidden during the takeoff and landing cutscenes */
+body.in-cutscene #time-readout {
+  visibility: hidden;
+}
+
+.clock-row {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  line-height: 1.5;
+}
+.clock-label {
+  width: 3.6em;
+  white-space: nowrap;
+  color: var(--clock-label);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+.clock-value {
+  color: var(--clock-text);
+  font: 600 15px ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+/* Home time: the one that races. A warning light blinks beside it,
+   faster on planets with a bigger time slip (timeSlip.js sets --clock-pulse). */
+.clock-row-home .clock-value {
+  color: var(--clock-home);
+}
+.clock-row-home::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: var(--clock-home);
+  box-shadow: 0 0 6px var(--clock-home);
+  animation: clock-pulse var(--clock-pulse, 1s) ease-in-out infinite alternate;
+}
+@keyframes clock-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.15; }
+}
+.clock-slip {
+  margin-top: 3px;
+  padding-top: 4px;
+  border-top: 1px solid var(--clock-border);
+  color: var(--clock-slip);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-align: right;
+}
