@@ -34,7 +34,8 @@ import { pickLine } from './kevinBrain.js';
 // ---- Timings ----
 const SAVE_EVERY = 5;        // seconds between saves (it also saves as the page closes)
 const WARN_FROM_SLIP = 10;   // Kevin warns you on planets with at least this much time slip
-const WARN_EVERY = 90;       // ...every this many seconds of play there
+const FIRST_WARNING = 90;    // ...first after this many seconds of play there
+const WARN_EVERY = 240;      // ...then every this many seconds (4 minutes)
 const HOLD_WARNING = 15;     // a warning that's due waits up to this long for Kevin to stop talking
 
 const SAVE_KEY = 'voxelgame.clocks.v2'; // v2: the trip timer (v1 was a running total)
@@ -123,7 +124,7 @@ export class TimeSlip {
     if (!this.atHome && !this.trip) this.startTrip();
 
     this.saveTimer = SAVE_EVERY;
-    this.warnTimer = WARN_EVERY;
+    this.warnTimer = FIRST_WARNING;
     this.talk = null;  // Kevin's voice (setTalk), for the warnings
     this.player = null;
     window.addEventListener('pagehide', () => this.save());
