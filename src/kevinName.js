@@ -2,7 +2,7 @@
 //
 // It starts as "Kevin", and the player can rename him: look at him and press
 // N, type a new name, Enter saves it, Escape cancels. The name is saved in
-// the browser (localStorage), so it stays after a reload. "Reset world" on
+// the browser (localStorage), so it stays after a reload. "Reset everything" on
 // the pause screen puts it back to "Kevin".
 //
 // Anything that shows or says his name (the name tag now, his speech bubbles
@@ -41,7 +41,7 @@ export function setKevinName(newName) {
   return true;
 }
 
-// Back to "Kevin" (used by "Reset world").
+// Back to "Kevin" (used by "Reset everything").
 export function resetKevinName() {
   try {
     localStorage.removeItem(STORAGE_KEY);

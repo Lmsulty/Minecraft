@@ -85,7 +85,7 @@ export class EditStore {
     }
   }
 
-  // Wipe every saved change (used by the "Reset world" button).
+  // Wipe every saved change on this planet (the "Reset this planet" button).
   clear() {
     clearTimeout(this.saveTimer);
     this.edits.clear();
@@ -96,5 +96,22 @@ export class EditStore {
     } catch (err) {
       console.warn('Could not clear saved world changes:', err);
     }
+  }
+}
+
+// Wipe the saved changes of EVERY planet, not just this one (the
+// "Reset everything" button). Every planet's save starts with this name,
+// so anything starting with it goes, including saves from older versions.
+const EDITS_PREFIX = 'voxelgame.edits.';
+export function clearAllPlanetEdits() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(EDITS_PREFIX)) keys.push(key);
+    }
+    for (const key of keys) localStorage.removeItem(key); // removed after the loop, so the count doesn't shift mid-way
+  } catch (err) {
+    console.warn('Could not clear every planet\'s saved changes:', err);
   }
 }

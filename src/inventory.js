@@ -285,7 +285,7 @@ export class Inventory {
 
   // Before planets, the inventory was saved under home's seed. The first time
   // the game runs with planets, move that save over to the shared one, so
-  // nothing is lost. (It's moved, not copied, so "Reset world" can't bring it back.)
+  // nothing is lost. (It's moved, not copied, so "Reset everything" can't bring it back.)
   moveOldSave() {
     const oldKey = `voxelgame.inventory.seed${THEME.planets.home.seed}.v1`;
     try {
@@ -343,7 +343,7 @@ export class Inventory {
     }
   }
 
-  // Empty everything and forget the save (used by the "Reset world" button).
+  // Empty everything and forget the save (used by the "Reset everything" button).
   clear() {
     clearTimeout(this.saveTimer);
     this.slots.fill(null);

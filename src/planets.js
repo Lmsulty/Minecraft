@@ -15,7 +15,7 @@ import { THEME, PLANET_SAVE_KEY } from './theme.js';
 // ---- Debug key ----
 // true = press P to jump straight to the next planet (for testing).
 // Set this to false before the game is judged.
-export const DEBUG_PLANET_KEY = true;
+export const DEBUG_PLANET_KEY = false;
 
 // Remembered for just this one reload: "we're arriving by ship", so the
 // landing cutscene plays (cutscene.js). The debug key travels without it.
@@ -34,6 +34,17 @@ export function travelTo(name, { byShip = false } = {}) {
     return; // without the save, the reload would land you back here
   }
   location.reload();
+}
+
+// Forget which planet you're on, so the next reload starts at home
+// ("Reset everything" on the pause screen). Doesn't reload by itself.
+export function forgetPlanet() {
+  try {
+    localStorage.removeItem(PLANET_SAVE_KEY);
+    sessionStorage.removeItem(ARRIVAL_KEY); // no landing cutscene either
+  } catch (err) {
+    console.warn('Could not forget which planet you were on:', err);
+  }
 }
 
 // Did we just arrive by ship? (Only true once: it's forgotten straight away.)

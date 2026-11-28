@@ -130,8 +130,34 @@
       #creative-badge.show {
         display: block;
       }
-      #reset {
+      /* The controls list: a short label on the left, the keys on the right */
+      #controls {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 6px 14px;
+        margin: 4px 0 0;
+        font-size: 15px;
+      }
+      #controls dt {
+        font-weight: bold;
+        text-align: right;
+      }
+      #controls dd {
+        margin: 0;
+        opacity: 0.85;
+      }
+      #overlay p.controls-note {
+        font-size: 13px;
+        opacity: 0.65;
+      }
+      /* The two reset buttons, side by side */
+      #resets {
+        display: flex;
+        gap: 10px;
         margin-top: 12px;
+      }
+      #reset,
+      #reset-all {
         padding: 8px 16px;
         font: 14px system-ui, sans-serif;
         color: var(--text);
@@ -140,7 +166,8 @@
         border-radius: 6px;
         cursor: pointer;
       }
-      #reset:hover {
+      #reset:hover,
+      #reset-all:hover {
         background: var(--button-bg-hover);
       }
       /* Graphics: Auto / Low / Medium / High */
@@ -211,12 +238,19 @@
     <div id="kevin-chat"></div>
     <div id="overlay">
       <h1>Click to play</h1>
-      <p>WASD move · Mouse look · Space jump · Esc pause · T speed up time · C creative mode · B curved view</p>
-      <p>E or Tab inventory · Shift-click moves a stack · Right click splits</p>
-      <p>Left click break · Right click place · 1–9 or scroll to pick block</p>
-      <p>Enter to chat with your robot · Look at him and press N to rename him · M mutes his voice</p>
-      <p>Broken blocks go in your hotbar. Placing a block uses one up.</p>
-      <p>Your changes and inventory save automatically.</p>
+      <dl id="controls">
+        <dt>Move</dt>
+        <dd>WASD walk · Mouse look · Space jump · Esc pause</dd>
+        <dt>Build</dt>
+        <dd>Left click break · Right click place · 1–9 or scroll pick a block</dd>
+        <dt>Items</dt>
+        <dd>E or Tab inventory &amp; crafting · C creative mode</dd>
+        <dt>Robot</dt>
+        <dd>Enter chat · N rename (look at him) · M mute</dd>
+        <dt>Travel</dt>
+        <dd>R board the rocket (near its ramp) · T speed up time</dd>
+      </dl>
+      <p class="controls-note">Everything saves automatically.</p>
       <div id="graphics">
         <span>Graphics:</span>
         <button type="button" data-choice="auto">Auto</button>
@@ -225,7 +259,10 @@
         <button type="button" data-choice="high">High</button>
       </div>
       <button id="kevin-voice" type="button"></button>
-      <button id="reset" type="button">Reset world</button>
+      <div id="resets">
+        <button id="reset" type="button">Reset this planet</button>
+        <button id="reset-all" type="button">Reset everything</button>
+      </div>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>

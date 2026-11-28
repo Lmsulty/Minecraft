@@ -5,13 +5,13 @@ import { BLOCK_TYPES } from './blocks.js';
 import { Player } from './player.js';
 import { Interaction } from './interaction.js';
 import { FpsCounter } from './fps.js';
-import { EditStore } from './storage.js';
+import { EditStore, clearAllPlanetEdits } from './storage.js';
 import { Hotbar } from './hotbar.js';
 import { Inventory } from './inventory.js';
 import { CreativeToggle } from './creative.js';
 import { InventoryScreen } from './inventoryScreen.js';
 import { applyUiTheme, THEME, PLANET } from './theme.js';
-import { setupDebugPlanetKey, takeArrival } from './planets.js';
+import { setupDebugPlanetKey, takeArrival, forgetPlanet } from './planets.js';
 import { Cutscene } from './cutscene.js';
 import { Ship, chooseShipSite } from './ship.js';
 import { ShipPicker } from './shipPicker.js';
@@ -216,14 +216,31 @@ const shipPicker = new ShipPicker(document.getElementById('ship-hint'),
 // ---- Debug: press P to jump to the next planet, no cutscene (switch off in planets.js) ----
 setupDebugPlanetKey(() => !!cutscene.active);
 
-// ---- "Reset world" button on the pause screen ----
+// ---- "Reset this planet" button on the pause screen ----
+// Only this planet's builds. Your inventory, the clocks, Kevin's name and
+// the other planets all stay as they are.
 document.getElementById('reset').addEventListener('click', (e) => {
   e.stopPropagation(); // don't also count as "click to play"
-  if (!confirm('Reset the world? All your changes and your inventory will be lost.')) return;
+  if (!confirm(`Reset ${PLANET.name}?\n\nEverything you've built or broken on this planet will be lost. ` +
+    'Your inventory and your other planets are kept.')) return;
   editStore.clear();
+  location.reload(); // start fresh: the planet regenerates from its seed
+});
+
+// ---- "Reset everything" button: a brand new game ----
+document.getElementById('reset-all').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!confirm('Reset EVERYTHING?\n\n' +
+    'This wipes your builds on every planet, your inventory, the time slip clocks ' +
+    'and your robot\'s name, and sends you back home.\n\n' +
+    'This can\'t be undone.')) return;
+  editStore.clear();      // this planet (and stops it saving again as the page reloads)
+  clearAllPlanetEdits();  // ...and every other planet
   inventory.clear();
-  resetKevinName(); // back to "Kevin"
-  location.reload(); // start fresh: the world regenerates from the seed
+  timeSlip.clear();
+  resetKevinName();       // back to "Kevin"
+  forgetPlanet();         // the reload starts at home
+  location.reload();
 });
 
 // ---- Keep the picture the right shape when the window resizes ----

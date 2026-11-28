@@ -148,10 +148,24 @@ export class TimeSlip {
   }
 
   save() {
+    if (this.disabled) return; // wiped by "Reset everything": don't save it back as the page reloads
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({ homeTotal: this.homeTotal, trip: this.trip }));
     } catch (err) {
       console.warn('Could not save the clocks:', err);
+    }
+  }
+
+  // Both clocks and home's date back to the very start, and the save
+  // forgotten ("Reset everything" on the pause screen, which then reloads).
+  clear() {
+    this.disabled = true;
+    this.homeTotal = 0;
+    this.trip = null;
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch (err) {
+      console.warn('Could not clear the clocks:', err);
     }
   }
 

@@ -750,7 +750,7 @@ export const THEME = {
     '--panel-bg': 'rgba(0, 0, 0, 0.5)',          // FPS box and "Saved" message
     '--crosshair': '#ffffff',
     '--crosshair-shadow': '#000000',
-    '--button-bg': 'rgba(160, 40, 40, 0.85)',    // "Reset world" button
+    '--button-bg': 'rgba(160, 40, 40, 0.85)',    // the two reset buttons
     '--button-bg-hover': 'rgba(190, 50, 50, 0.95)',
     '--button-border': 'rgba(255, 255, 255, 0.4)',
     '--choice-bg': 'rgba(255, 255, 255, 0.1)',          // Graphics buttons on the pause screen
